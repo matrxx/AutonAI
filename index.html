@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple AI Agent</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>AI Agent</h1>
+        
+        <div class="upload-section">
+            <h3>Upload Document</h3>
+            <input type="file" id="file-upload" accept=".pdf,.docx,.txt">
+            <button id="upload-button">Upload</button>
+            <div id="file-info"></div>
+        </div>
+        
+        <div class="chat-container" id="chat-container"></div>
+        
+        <div class="input-section">
+            <input type="text" id="user-input" placeholder="Type your message here...">
+            <button id="send-button">Send</button>
+            <button id="clear-button">Clear</button>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
