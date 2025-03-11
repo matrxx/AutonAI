@@ -1,0 +1,9 @@
+pip install flask
+pip install flask-cors
+pip install requests
+pip install PyPDF2
+pip install python-docx
+
+#or
+
+pip install flask flask-cors requests PyPDF2 python-docx

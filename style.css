@@ -1,0 +1,91 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+}
+
+.upload-section {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.chat-container {
+    height: 400px;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.message {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.user {
+    background-color: #e6f7ff;
+    margin-left: 20%;
+}
+
+.assistant {
+    background-color: #f1f1f1;
+    margin-right: 20%;
+}
+
+.thinking {
+    font-style: italic;
+    color: #888;
+}
+
+.input-section {
+    display: flex;
+    gap: 10px;
+}
+
+#user-input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+button {
+    padding: 10px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+#upload-button {
+    margin-left: 10px;
+}
+
+#file-info {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #666;
+}
