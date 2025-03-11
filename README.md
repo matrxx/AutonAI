@@ -6,7 +6,7 @@
 5. Run "agent.py" to start the LLM
 6. Go to http://localhost/AutonAI/index.html on your web browser to start using AutonAI
 
-![image](https://github.com/user-attachments/assets/70376def-4d24-4696-9f37-eac24d109ccc)
+![AutonAI - Logo](https://github.com/user-attachments/assets/a233199c-266d-45dd-be3c-118b1be7495e)
 
 # Roadmap:
 
