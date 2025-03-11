@@ -7,3 +7,25 @@
 6. Go to http://localhost/AutonAI/index.html on your web browser to start using AutonAI
 
 ![image](https://github.com/user-attachments/assets/70376def-4d24-4696-9f37-eac24d109ccc)
+
+# Roadmap:
+
+--> Better website design
+  --> Charge bar for the project in real time
+  --> Better button localization
+  --> Night mode
+  --> Branding (logo, identity, favicon, font)
+  --> Animated? (agents tasks representations) *secondary*
+
+--> Better console
+  --> Upgrade the console looks
+  --> Fix the fetching errors
+  --> Fix the "tool" error
+
+--> Better autonomous agents
+  --> Fix the problems and make everything working as intended
+  --> Make them upload the final render on the web to get the work
+
+--> Better LLM
+  --> Try a better LLM to upgrade the overall AI framework of AutonAI
+  --> Optimize it for the multiple agent tasks
