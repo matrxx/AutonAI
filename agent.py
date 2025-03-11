@@ -386,15 +386,35 @@ def process_task(task):
         tool_name = parsed["tool"]
         tool_input = parsed["input"]
         
-        tool_result = "Tool not found"
+        tool_result = None
+        found_tool = False
         
-        # Look for tool in common tools
-        if tool_name in COMMON_TOOLS:
-            tool_result = COMMON_TOOLS[tool_name].run(tool_input)
+        # Look for tool in common tools with case-insensitive matching
+        if tool_name.lower() in [t.lower() for t in COMMON_TOOLS.keys()]:
+            # Find the actual key with correct casing
+            for key in COMMON_TOOLS.keys():
+                if key.lower() == tool_name.lower():
+                    tool_result = COMMON_TOOLS[key].run(tool_input)
+                    found_tool = True
+                    break
         
-        # Look for tool in agent-specific tools
-        elif agent_type in AGENT_TOOLS and tool_name in AGENT_TOOLS[agent_type]:
-            tool_result = AGENT_TOOLS[agent_type][tool_name].run(tool_input)
+        # Look for tool in agent-specific tools with case-insensitive matching
+        elif agent_type in AGENT_TOOLS:
+            for key in AGENT_TOOLS[agent_type].keys():
+                if key.lower() == tool_name.lower():
+                    tool_result = AGENT_TOOLS[agent_type][key].run(tool_input)
+                    found_tool = True
+                    break
+        
+        # If tool not found, log the error and provide a helpful message
+        if not found_tool:
+            available_tools = list(COMMON_TOOLS.keys())
+            if agent_type in AGENT_TOOLS:
+                available_tools.extend(list(AGENT_TOOLS[agent_type].keys()))
+            
+            error_msg = f"Tool '{tool_name}' not found. Available tools: {', '.join(available_tools)}"
+            log_update("System", error_msg)
+            tool_result = error_msg
         
         # Log the tool usage
         log_update(agent_type, f"Used tool: {tool_name} with input: {tool_input}")

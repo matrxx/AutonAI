@@ -20,6 +20,7 @@ const API_BASE_URL = 'http://127.0.0.1:5001';
 const STATUS_POLL_INTERVAL = 5000; // 5 seconds
 const CONSOLE_POLL_INTERVAL = 3000; // 3 seconds
 const MAX_CONSOLE_LINES = 500; // Maximum number of console lines to kee
+const MAX_CONSECUTIVE_ERRORS = 3;
 
 // App state
 let isProjectRunning = false;
@@ -27,6 +28,7 @@ let statusPollingInterval = null;
 let consoleVisible = false;
 let consolePollingInterval = null;
 let lastSeenLogTimestamp = null;
+let consecutiveErrors = 0;
 
 // Event Listeners
 sendButton.addEventListener('click', sendMessage);
@@ -41,6 +43,78 @@ statusButton.addEventListener('click', requestStatusUpdate);
 toggleConsoleButton.addEventListener('click', toggleConsole);
 refreshConsoleButton.addEventListener('click', fetchConsoleLogs);
 
+// Update fetchConsoleLogs to be more resilient
+function fetchConsoleLogs() {
+    // Add a notice when starting with no backend
+    if (consoleOutput.children.length === 0) {
+        consoleOutput.innerHTML = `<div class="console-line">
+            <span class="console-timestamp">${new Date().toISOString()}</span>
+            <span class="console-agent console-agent-system">[System]</span>
+            <span class="console-message">Connecting to backend server...</span>
+        </div>`;
+    }
+    
+    fetch(`${API_BASE_URL}/api/logs`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}`);
+            }
+            consecutiveErrors = 0; // Reset error counter on success
+            
+            // Clear the initial connecting message if it exists
+            if (consoleOutput.children.length === 1 && 
+                consoleOutput.children[0].textContent.includes("Connecting to backend server")) {
+                consoleOutput.innerHTML = "";
+            }
+            
+            return response.json();
+        })
+        .then(data => {
+            updateConsoleOutput(data.logs);
+        })
+        .catch(error => {
+            // Don't add a new error message if the backend is not available yet
+            // and we're already showing errors
+            if (consoleOutput.querySelector('.console-line:last-child .console-message')?.textContent.includes('Error fetching logs')) {
+                // Just update the timestamp on the last error
+                const lastTimestamp = consoleOutput.querySelector('.console-line:last-child .console-timestamp');
+                if (lastTimestamp) {
+                    lastTimestamp.textContent = `[${new Date().toISOString()}]`;
+                }
+                return;
+            }
+            
+            // Add a new error message if this is the first one
+            consoleOutput.innerHTML += `<div class="console-line">
+                <span class="console-timestamp">[${new Date().toISOString()}]</span>
+                <span class="console-agent console-agent-system">[System]</span>
+                <span class="console-message">Error fetching logs: Backend server not available. Start the Python server to see logs.</span>
+            </div>`;
+            
+            // Auto-scroll to bottom if enabled
+            if (autoScrollCheckbox.checked) {
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+        });
+}
+
+// Also, let's not start polling immediately when the page loads
+// Update the initializeUI function
+function initializeUI() {
+    // Display welcome message
+    appendMessage('system', 'Multi-Agent System initialized. The following agents are ready to assist you:\n' +
+        '- ProjectManager: Planning, coordination, delegation, evaluation\n' +
+        '- FrontendDev: HTML, CSS, JavaScript, UI design, responsive design\n' +
+        '- BackendDev: API design, database, server logic, authentication, security\n' +
+        '- ContentWriter: Copywriting, SEO, storytelling, product descriptions, marketing\n\n' +
+        'To start a project, type "start project: [your project description]"');
+
+    // Don't fetch status automatically on page load
+    // We'll only do this when the user explicitly interacts with the system
+}
+
+// And update the toggleConsole function to only show one error
+
 function toggleConsole() {
     consoleVisible = !consoleVisible;
     
@@ -48,31 +122,30 @@ function toggleConsole() {
         consoleContainer.style.display = 'flex';
         toggleConsoleButton.textContent = 'Hide Console';
         toggleConsoleButton.classList.add('active');
-        fetchConsoleLogs(); // Fetch logs immediately
-        startConsolePolling(); // Start polling for updates
+        
+        // Clear the console first
+        consoleOutput.innerHTML = "";
+        
+        // Only fetch logs once when showing the console
+        fetchConsoleLogs();
+        
+        // Only start polling if we successfully connect
+        fetch(`${API_BASE_URL}/api/logs`)
+            .then(response => {
+                if (response.ok) {
+                    startConsolePolling();
+                }
+            })
+            .catch(() => {
+                // Don't start polling if we can't connect
+                // We'll just show one error message
+            });
     } else {
         consoleContainer.style.display = 'none';
         toggleConsoleButton.textContent = 'Show Console';
         toggleConsoleButton.classList.remove('active');
-        stopConsolePolling(); // Stop polling when console is hidden
+        stopConsolePolling();
     }
-}
-
-// Add this function to fetch console logs
-function fetchConsoleLogs() {
-    fetch(`${API_BASE_URL}/api/logs`)
-        .then(response => response.json())
-        .then(data => {
-            updateConsoleOutput(data.logs);
-        })
-        .catch(error => {
-            console.error('Error fetching console logs:', error);
-            consoleOutput.innerHTML += `<div class="console-line">
-                <span class="console-timestamp">${new Date().toISOString()}</span>
-                <span class="console-agent console-agent-system">[System]</span>
-                <span class="console-message">Error fetching logs: ${error.message}</span>
-            </div>`;
-        });
 }
 
 // Add this function to update the console output
@@ -140,19 +213,6 @@ function escapeHtml(text) {
 
 // Initialize the UI
 initializeUI();
-
-function initializeUI() {
-    // Display welcome message
-    appendMessage('system', 'Multi-Agent System initialized. The following agents are ready to assist you:\n' +
-        '- ProjectManager: Planning, coordination, delegation, evaluation\n' +
-        '- FrontendDev: HTML, CSS, JavaScript, UI design, responsive design\n' +
-        '- BackendDev: API design, database, server logic, authentication, security\n' +
-        '- ContentWriter: Copywriting, SEO, storytelling, product descriptions, marketing\n\n' +
-        'To start a project, type "start project: [your project description]"');
-
-    // Fetch current status
-    fetchStatus();
-}
 
 // Helper function to append messages to the chat
 function appendMessage(role, content) {
@@ -369,15 +429,6 @@ function updateProjectStatus(status) {
     }
 }
 
-function initializeUI() {
-    // Display welcome message
-    appendMessage('system', 'Multi-Agent System initialized. The following agents are ready to assist you:\n' +
-        '- ProjectManager: Planning, coordination, delegation, evaluation\n' +
-        '- FrontendDev: HTML, CSS, JavaScript, UI design, responsive design\n' +
-        '- BackendDev: API design, database, server logic, authentication, security\n' +
-        '- ContentWriter: Copywriting, SEO, storytelling, product descriptions, marketing\n\n' +
-        'To start a project, type "start project: [your project description]"');
-
     // Fetch current status
     fetch(`${API_BASE_URL}/api/status`)
         .then(response => response.json())
@@ -398,7 +449,6 @@ function initializeUI() {
         .catch(error => {
             console.error('Error fetching status:', error);
         });
-}
 
 // Start polling for status updates
 function startStatusPolling() {
