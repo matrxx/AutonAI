@@ -1,10 +1,11 @@
 # AutonAI
 1. Install Ollama via https://ollama.com/ and wamp via https://wampserver.aviatechno.net/ (+ all the packages)
-2. Run "dl_llama2.py" to install a local version of the agent
-3. Run "test_" to check if the AI agent is ready to run *not set yet*
-4. Adapt structure : put the html/css/js files in www/ from wamp and the py files elsewhere
-5. Run "agent.py" to start the LLM
-6. Go to http://localhost/AutonAI/index.html on your web browser to start using AutonAI
+2. Install everything in the useful.txt via a pip install
+3. Run "dl_llama2.py" to install a local version of the agent
+4. Run "test_" to check if the AI agent is ready to run *not set yet*
+5. Adapt structure : put the html/css/js files in www/ from wamp and the py files elsewhere
+6. Run "agent.py" to start the LLM
+7. Go to http://localhost/AutonAI/index.html on your web browser to start using AutonAI
 
 ![AutonAI - Logo](https://github.com/user-attachments/assets/a233199c-266d-45dd-be3c-118b1be7495e)
 
