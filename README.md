@@ -10,6 +10,7 @@
 ![AutonAI - Logo](https://github.com/user-attachments/assets/a233199c-266d-45dd-be3c-118b1be7495e)
 
 # Roadmap:
+*for the roadmap basically eveything is under the radar but the points with the 🛠️ emoji means that it is the priority*
 
 • Better website design
 
