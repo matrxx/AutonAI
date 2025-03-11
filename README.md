@@ -10,7 +10,7 @@
 
 # Roadmap:
 
---> Better website design
+• Better website design
 
   --> Charge bar for the project in real time
   
@@ -23,7 +23,7 @@
   --> Animated? (agents tasks representations) *secondary*
   
 
---> Better console
+• Better console
 
   --> Upgrade the console looks
   
@@ -32,14 +32,14 @@
   --> Fix the "tool" error
   
 
---> Better autonomous agents
+• Better autonomous agents
 
   --> Fix the problems and make everything working as intended
   
   --> Make them upload the final render on the web to get the work
   
 
---> Better LLM
+• Better LLM
 
   --> Try a better LLM to upgrade the overall AI framework of AutonAI
   
