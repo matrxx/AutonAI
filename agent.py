@@ -2,6 +2,11 @@ from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import os
 import json
+import time
+import uuid
+import threading
+import queue
+from datetime import datetime
 from typing import List, Dict, Any
 import requests
 import re
@@ -13,6 +18,20 @@ from io import BytesIO
 app = Flask(__name__)
 CORS(app, origins="*", allow_headers=["Content-Type"], methods=["GET", "POST", "OPTIONS"])
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
+
+# Global variables for the task system
+task_queue = queue.Queue()
+agent_updates = []
+shared_memory = []
+document_context = ""
+system_running = False
+project_status = {
+    "description": "",
+    "tasks": [],
+    "progress": 0,
+    "start_time": None,
+    "last_update": None
+}
 
 class Tool:
     """A tool that the agent can use to interact with the world"""
@@ -29,37 +48,48 @@ class Tool:
     def __str__(self) -> str:
         return f"{self.name}: {self.description}"
 
-class Memory:
-    """Simple memory system for the agent"""
+class Task:
+    """Represents a task that can be assigned to an agent"""
     
-    def __init__(self, max_entries: int = 10):
-        self.conversations = []
-        self.max_entries = max_entries
+    def __init__(self, description, agent_type=None, priority=1, dependencies=None):
+        self.id = str(uuid.uuid4())[:8]  # Short unique ID
+        self.description = description
+        self.agent_type = agent_type
+        self.priority = priority  # 1 = highest, 5 = lowest
+        self.dependencies = dependencies or []
+        self.status = "pending"  # pending, in_progress, completed, blocked
+        self.created_at = datetime.now()
+        self.updated_at = self.created_at
+        self.completed_at = None
+        self.result = None
+        self.notes = []
         
-    def add(self, role: str, content: str):
-        """Add an entry to memory"""
-        self.conversations.append({"role": role, "content": content})
-        if len(self.conversations) > self.max_entries:
-            self.conversations.pop(0)
+    def update_status(self, status, note=None):
+        self.status = status
+        self.updated_at = datetime.now()
+        if note:
+            self.add_note(note)
+        if status == "completed":
+            self.completed_at = datetime.now()
     
-    def get_context(self) -> List[Dict[str, str]]:
-        """Get the current context from memory"""
-        return self.conversations.copy()
+    def add_note(self, note):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.notes.append({"timestamp": timestamp, "note": note})
     
-    def get_chat_history(self) -> List[Dict[str, str]]:
-        """Get formatted chat history for display"""
-        history = []
-        for msg in self.conversations:
-            if msg["role"] in ["user", "assistant"]:
-                history.append({
-                    "role": msg["role"],
-                    "content": msg["content"]
-                })
-        return history
-    
-    def clear(self):
-        """Clear the memory"""
-        self.conversations = []
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "description": self.description,
+            "agent_type": self.agent_type,
+            "priority": self.priority,
+            "status": self.status,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "completed_at": self.completed_at.strftime("%Y-%m-%d %H:%M:%S") if self.completed_at else None,
+            "result": self.result,
+            "notes": self.notes,
+            "dependencies": self.dependencies
+        }
 
 class DocumentProcessor:
     """Process various document types"""
@@ -99,184 +129,60 @@ class DocumentProcessor:
         else:
             return "Unsupported file format"
 
-class Agent:
-    """AI agent that can use tools and maintain context"""
-    
-    def __init__(self, model: str = "llama2:13b"):
-        self.model = model
-        self.memory = Memory()
-        self.tools = []
-        self.document_context = ""
-        self.system_prompt = """You are a helpful AI assistant. When you need to perform an action, use one of the available tools by responding in this exact format:
-ACTION: tool_name
-INPUT: input for the tool
+# Define the agent types and their capabilities
+AGENT_TYPES = {
+    "ProjectManager": {
+        "role": "Project Manager",
+        "skills": ["planning", "coordination", "delegation", "evaluation"],
+        "system_prompt": """You are a Project Manager AI assistant. Your responsibilities include:
+1. Breaking down projects into manageable tasks
+2. Assigning tasks to appropriate specialists
+3. Tracking project progress
+4. Coordinating between team members
+5. Ensuring all requirements are met
 
-If you don't need to use a tool, just respond normally."""
-    
-    def add_tool(self, tool: Tool):
-        """Add a tool that the agent can use"""
-        self.tools.append(tool)
-        
-    def set_system_prompt(self, prompt: str):
-        """Set the system prompt for the agent"""
-        self.system_prompt = prompt
-    
-    def set_document_context(self, text: str):
-        """Set document context for the agent to reference"""
-        self.document_context = text
-    
-    def clear_document_context(self):
-        """Clear document context"""
-        self.document_context = ""
-    
-    def _get_available_tools_description(self) -> str:
-        """Get a description of all available tools"""
-        if not self.tools:
-            return "No tools available."
-        
-        return "Available tools:\n" + "\n".join([str(tool) for tool in self.tools])
-    
-    def _call_llm(self, messages):
-        """Call the local Ollama API"""
-        import requests
-        
-        # Format the messages for Ollama
-        prompt = ""
-        for msg in messages:
-            role = msg["role"]
-            content = msg["content"]
-            if role == "system":
-                prompt += f"<s>[INST] <<SYS>>\n{content}\n<</SYS>>\n\n"
-            elif role == "user":
-                if not prompt:  # First message
-                    prompt += f"<s>[INST] {content} [/INST]"
-                else:  # Not the first message
-                    prompt += f"[INST] {content} [/INST]"
-            elif role == "assistant":
-                prompt += f" {content} </s>"
-        
-        # Call the Ollama API
-        try:
-            response = requests.post('http://localhost:11434/api/generate',
-                            json={
-                                'model': self.model,
-                                'prompt': prompt,
-                                'stream': False
-                            }, timeout=60)  # Longer timeout for larger model
-            
-            if response.status_code == 200:
-                return response.json()['response']
-            else:
-                return f"Error calling Ollama API: {response.status_code} - {response.text}"
-        except Exception as e:
-            return f"Error connecting to Ollama: {str(e)}"
-    
-    def _parse_response(self, response: str):
-        """Parse the LLM response to extract any action and input"""
-        # Check for the formal ACTION structure
-        if "ACTION:" in response:
-            action_part = response.split("ACTION:")[1].strip()
-            tool_name = action_part.split("\n")[0].strip()
-            
-            # Only proceed if we find an INPUT section
-            if "INPUT:" in action_part:
-                input_part = action_part.split("INPUT:")[1].strip()
-                
-                # Only process valid inputs
-                if input_part:
-                    return {
-                        "use_tool": True,
-                        "tool_name": tool_name,
-                        "input": input_part
-                    }
-        
-        # If we get here, no valid tool usage was detected
-        return {
-            "use_tool": False,
-            "response": response
-        }
-    
-    def _execute_tool(self, tool_name: str, input_str: str) -> str:
-        """Execute a tool by name"""
-        for tool in self.tools:
-            if tool.name.lower() == tool_name.lower():
-                return tool.run(input_str)
-        
-        return f"Error: Tool '{tool_name}' not found."
-    
-    def run(self, user_input: str) -> str:
-        """Run the agent with a user input"""
-        # Direct handling for simple calculations - only if the input is clearly a calculation
-        if re.match(r'^\s*\d+\s*[\+\-\*\/]\s*\d+\s*$', user_input):
-            calculation = user_input.strip()
-            result = self._execute_tool("calculator", calculation)
-            return f"The result of {calculation} is {result.split(': ')[1]}"
-            
-        # Add user input to memory
-        self.memory.add("user", user_input)
-        
-        # Prepare system message with document context if available
-        system_content = f"{self.system_prompt}\n\n{self._get_available_tools_description()}"
-        if self.document_context:
-            system_content += f"\n\nThe user has provided a document with the following content:\n{self.document_context}\n\nRefer to this document when answering related questions."
-        
-        # Add clear instructions
-        system_content += """
+When creating tasks, be specific about what needs to be done. Assign priorities (1-5, where 1 is highest) 
+and identify the most suitable agent type for each task."""
+    },
+    "FrontendDev": {
+        "role": "Frontend Developer",
+        "skills": ["HTML", "CSS", "JavaScript", "UI design", "responsive design"],
+        "system_prompt": """You are a Frontend Developer AI assistant. Your responsibilities include:
+1. Creating user interfaces with HTML, CSS, and JavaScript
+2. Implementing responsive designs that work on all devices
+3. Developing interactive web components
+4. Ensuring good user experience and accessibility
+5. Working with the backend developer to integrate with APIs
 
-IMPORTANT RULES:
-1. Only use a tool when the user explicitly asks for information that requires that tool.
-2. For general conversation, questions about yourself, or any non-tool tasks, just respond normally without using tools.
-3. Use the calculator tool only for mathematical calculations.
-4. Use the weather tool only when asked about weather in a specific location.
-5. Use the search tool only when asked to find or search for specific information.
-6. If the user has provided a document, reference its content when answering related questions.
-"""
-        
-        messages = [
-            {"role": "system", "content": system_content}
-        ]
-        messages.extend(self.memory.get_context())
-        
-        # Get response from LLM
-        response = self._call_llm(messages)
-        
-        # Parse the response for possible tool usage
-        parsed = self._parse_response(response)
-        
-        # If a tool should be used
-        if parsed["use_tool"]:
-            tool_name = parsed["tool_name"]
-            tool_input = parsed["input"]
-            
-            # Execute the tool
-            tool_output = self._execute_tool(tool_name, tool_input)
-            
-            # For simple calculations, return the result directly
-            if tool_name.lower() == "calculator":
-                result = tool_output.split(": ")[1] if ": " in tool_output else tool_output
-                final_response = f"The result of {tool_input} is {result}"
-                self.memory.add("assistant", final_response)
-                return final_response
-            
-            # Add tool usage to memory
-            self.memory.add("assistant", f"I'll help you with that using the {tool_name} tool.")
-            self.memory.add("system", f"Tool result: {tool_output}")
-            
-            # Get final response with the tool result
-            messages = [
-                {"role": "system", "content": f"You are a helpful assistant. The user asked: '{user_input}'. You used the {tool_name} tool and got this result: '{tool_output}'. Now provide a helpful response based on this information."}
-            ]
-            
-            final_response = self._call_llm(messages)
-            self.memory.add("assistant", final_response)
-            
-            return final_response
-        else:
-            # No tool needed, just return the response
-            self.memory.add("assistant", parsed["response"])
-            return parsed["response"]
+Focus on writing clean, maintainable code and providing detailed explanations of your implementation choices."""
+    },
+    "BackendDev": {
+        "role": "Backend Developer",
+        "skills": ["API design", "database", "server logic", "authentication", "security"],
+        "system_prompt": """You are a Backend Developer AI assistant. Your responsibilities include:
+1. Designing and implementing APIs
+2. Creating database schemas and queries
+3. Implementing server-side business logic
+4. Setting up authentication and authorization
+5. Ensuring data security and performance
 
-# Define tools
+Focus on writing robust, secure code and providing detailed explanations of your implementation choices."""
+    },
+    "ContentWriter": {
+        "role": "Content Writer",
+        "skills": ["copywriting", "SEO", "storytelling", "product descriptions", "marketing"],
+        "system_prompt": """You are a Content Writer AI assistant. Your responsibilities include:
+1. Creating engaging and persuasive marketing copy
+2. Writing SEO-optimized content
+3. Developing product descriptions
+4. Crafting brand stories and narratives
+5. Editing and proofreading content
+
+Focus on writing clear, compelling content that resonates with the target audience and achieves the project goals."""
+    }
+}
+
+# Define agent tools
 def search_web(query: str) -> str:
     """Simulate a web search tool (in a real implementation, use an actual search API)"""
     return f"Search results for '{query}' would appear here"
@@ -297,40 +203,572 @@ def summarize_text(text: str) -> str:
     """Tool to summarize text (in a real implementation, use an LLM for this)"""
     return f"Summary of text ({len(text)} characters): This is a placeholder for text summarization."
 
-# Initialize agent
-agent = Agent(model="llama2:13b")
-agent.add_tool(Tool("search", "Search the web for information", search_web))
-agent.add_tool(Tool("weather", "Get the current weather for a location", get_weather))
-agent.add_tool(Tool("calculator", "Perform mathematical calculations", calculate))
-agent.add_tool(Tool("summarize", "Summarize text content", summarize_text))
+# Common tools available to all agents
+COMMON_TOOLS = {
+    "search": Tool("search", "Search the web for information", search_web),
+    "calculate": Tool("calculate", "Perform mathematical calculations", calculate),
+}
 
-agent.set_system_prompt("""You are a helpful AI assistant with access to tools and document processing capabilities.
-When asked for information that requires using a tool, use the appropriate tool.
-For general questions or conversation, respond directly without using tools.
-When referencing a document, cite specific details from the document.
-Keep your responses concise and directly address what the user is asking.""")
+# Agent-specific tools
+AGENT_TOOLS = {
+    "ContentWriter": {
+        "summarize": Tool("summarize", "Summarize long text", summarize_text),
+    },
+    # Add other agent-specific tools as needed
+}
 
+def call_llm(messages, model="llama2:13b", timeout=120):
+    """Call the local Ollama API with extended timeout"""
+    # Format the messages for Ollama
+    prompt = ""
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+        if role == "system":
+            prompt += f"<s>[INST] <<SYS>>\n{content}\n<</SYS>>\n\n"
+        elif role == "user":
+            if not prompt:  # First message
+                prompt += f"<s>[INST] {content} [/INST]"
+            else:  # Not the first message
+                prompt += f"[INST] {content} [/INST]"
+        elif role in ["assistant", "agent"]:
+            prompt += f" {content} </s>"
+    
+    # Call the Ollama API
+    try:
+        response = requests.post('http://localhost:11434/api/generate',
+                        json={
+                            'model': model,
+                            'prompt': prompt,
+                            'stream': False
+                        }, timeout=timeout)
+        
+        if response.status_code == 200:
+            return response.json()['response']
+        else:
+            return f"Error calling Ollama API: {response.status_code} - {response.text}"
+    except Exception as e:
+        return f"Error connecting to Ollama: {str(e)}"
+
+def parse_llm_response(response: str, expecting_json=False):
+    """Parse the LLM response for actions or JSON content"""
+    # Check for tool usage
+    if "ACTION:" in response:
+        action_part = response.split("ACTION:")[1].strip()
+        tool_name = action_part.split("\n")[0].strip()
+        
+        # Only proceed if we find an INPUT section
+        if "INPUT:" in action_part:
+            input_part = action_part.split("INPUT:")[1].strip()
+            
+            # Only process valid inputs
+            if input_part:
+                return {
+                    "type": "action",
+                    "tool": tool_name,
+                    "input": input_part
+                }
+    
+    # Check if we're expecting JSON
+    if expecting_json:
+        try:
+            # Look for JSON in the response (within code blocks or directly)
+            json_pattern = r'```(?:json)?\s*(\[.*\]|\{.*\})\s*```'
+            json_match = re.search(json_pattern, response, re.DOTALL)
+            
+            if json_match:
+                json_str = json_match.group(1)
+                return {
+                    "type": "json",
+                    "content": json.loads(json_str)
+                }
+            
+            # Try to find JSON without code blocks
+            json_pattern = r'(\[.*\]|\{.*\})'
+            json_match = re.search(json_pattern, response, re.DOTALL)
+            
+            if json_match:
+                # Try to parse as JSON
+                try:
+                    json_str = json_match.group(1)
+                    return {
+                        "type": "json",
+                        "content": json.loads(json_str)
+                    }
+                except:
+                    pass
+        except:
+            pass
+    
+    # Default to treating as plain text
+    return {
+        "type": "text",
+        "content": response
+    }
+
+def get_agent_prompt(agent_type, task_description):
+    """Get a prompt for a specific agent type and task"""
+    base_prompt = AGENT_TYPES[agent_type]["system_prompt"]
+    
+    prompt = f"""{base_prompt}
+
+Your current task is: {task_description}
+
+When you need to perform an action, use one of the available tools by responding in this exact format:
+ACTION: tool_name
+INPUT: input for the tool
+
+You can also provide your results in a structured format using JSON when appropriate.
+
+Project Context:
+{project_status["description"]}
+
+"""
+    
+    # Add document context if available
+    global document_context
+    if document_context:
+        prompt += f"\nDocument Context:\n{document_context}\n"
+    
+    # Add related task information
+    related_tasks = [t for t in project_status["tasks"] 
+                    if t["agent_type"] != agent_type and t["status"] == "completed"]
+    if related_tasks:
+        prompt += "\nCompleted tasks from other team members:\n"
+        for task in related_tasks[-3:]:  # Only show the last 3 to avoid context overflow
+            prompt += f"- {task['description']} (by {task['agent_type']})\n"
+            if task['result']:
+                prompt += f"  Result: {task['result'][:200]}...\n"
+    
+    return prompt
+
+def process_task(task):
+    """Process a single task using the appropriate agent"""
+    agent_type = task.agent_type
+    if not agent_type:
+        log_update("System", f"No agent type specified for task: {task.description}. Defaulting to ProjectManager.")
+        agent_type = "ProjectManager"
+    
+    # Get appropriate prompt for this agent and task
+    system_prompt = get_agent_prompt(agent_type, task.description)
+    
+    # Create context for the LLM
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Complete this task: {task.description}"}
+    ]
+    
+    # Add information about available tools
+    tools_description = "Available tools:\n"
+    # Add common tools
+    for tool_name, tool in COMMON_TOOLS.items():
+        tools_description += f"- {tool}\n"
+    
+    # Add agent-specific tools
+    if agent_type in AGENT_TOOLS:
+        for tool_name, tool in AGENT_TOOLS[agent_type].items():
+            tools_description += f"- {tool}\n"
+    
+    messages[0]["content"] += f"\n\n{tools_description}"
+    
+    # Update task status
+    task.update_status("in_progress", f"Task started by {agent_type}")
+    log_update(agent_type, f"Working on: {task.description}")
+    
+    # Call the LLM with an increased timeout
+    response = call_llm(messages, timeout=240)
+    
+    # Parse the response
+    parsed = parse_llm_response(response)
+    
+    if parsed["type"] == "action":
+        # Agent wants to use a tool
+        tool_name = parsed["tool"]
+        tool_input = parsed["input"]
+        
+        tool_result = "Tool not found"
+        
+        # Look for tool in common tools
+        if tool_name in COMMON_TOOLS:
+            tool_result = COMMON_TOOLS[tool_name].run(tool_input)
+        
+        # Look for tool in agent-specific tools
+        elif agent_type in AGENT_TOOLS and tool_name in AGENT_TOOLS[agent_type]:
+            tool_result = AGENT_TOOLS[agent_type][tool_name].run(tool_input)
+        
+        # Log the tool usage
+        log_update(agent_type, f"Used tool: {tool_name} with input: {tool_input}")
+        log_update("System", f"Tool result: {tool_result}")
+        
+        # Add the tool result to the conversation
+        messages.append({"role": "assistant", "content": f"I'll use the {tool_name} tool with input: {tool_input}"})
+        messages.append({"role": "system", "content": f"Tool result: {tool_result}"})
+        
+        # Ask the agent to provide its final result
+        messages.append({"role": "user", "content": "Now that you have the tool result, please complete the task and provide your final output."})
+        
+        # Get the final response
+        final_response = call_llm(messages, timeout=240)
+        task.result = final_response
+    else:
+        # Agent provided a direct response
+        task.result = response
+    
+    # Mark task as completed
+    task.update_status("completed", f"Task completed by {agent_type}")
+    log_update(agent_type, f"Completed task: {task.description}")
+    
+    # Return the result
+    return task.result
+
+def create_project_plan(description):
+    """Create an initial project plan using the project manager agent"""
+    global project_status
+    
+    # Reset project status
+    project_status = {
+        "description": description,
+        "tasks": [],
+        "progress": 0,
+        "start_time": datetime.now(),
+        "last_update": datetime.now()
+    }
+    
+    # Create a prompt for the project manager
+    system_prompt = AGENT_TYPES["ProjectManager"]["system_prompt"]
+    prompt = f"""
+{system_prompt}
+
+You need to create a detailed project plan for the following project:
+
+{description}
+
+Break down this project into specific tasks that can be assigned to our team of specialists:
+- ProjectManager (you): Planning, coordination, delegation
+- FrontendDev: HTML, CSS, JavaScript, UI design, responsive design
+- BackendDev: API design, database, server logic, authentication, security
+- ContentWriter: Copywriting, SEO, storytelling, product descriptions, marketing
+
+For each task, specify:
+1. A clear, specific description
+2. The agent type who should handle it
+3. Priority (1-5, where 1 is highest)
+4. Any dependencies (task IDs that must be completed first)
+
+Respond with a JSON array of tasks, where each task has the fields: description, agent_type, priority.
+"""
+    
+    # Call the LLM with an increased timeout
+    response = call_llm([{"role": "system", "content": prompt}], timeout=300)
+    
+    # Parse the response to extract tasks
+    parsed = parse_llm_response(response, expecting_json=True)
+    
+    tasks = []
+    if parsed["type"] == "json" and isinstance(parsed["content"], list):
+        # Successfully parsed JSON list of tasks
+        task_list = parsed["content"]
+        for task_data in task_list:
+            task = Task(
+                description=task_data.get("description", "Undefined task"),
+                agent_type=task_data.get("agent_type", "ProjectManager"),
+                priority=task_data.get("priority", 3),
+                dependencies=task_data.get("dependencies", [])
+            )
+            tasks.append(task)
+    else:
+        # Fallback: manual parsing
+        lines = response.split("\n")
+        current_task = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Look for task indicators
+            if line.startswith("-") or line.startswith("*") or line.startswith("Task"):
+                # Try to extract agent type
+                agent_match = re.search(r'(ProjectManager|FrontendDev|BackendDev|ContentWriter)', line)
+                agent_type = agent_match.group(1) if agent_match else "ProjectManager"
+                
+                # Create a new task
+                description = re.sub(r'^\s*[-*]\s*', '', line)
+                description = re.sub(r'\(.*?\)', '', description).strip()
+                
+                task = Task(description=description, agent_type=agent_type)
+                tasks.append(task)
+    
+    # If we still have no tasks, create a generic one
+    if not tasks:
+        task = Task(description=f"Implement project: {description}", agent_type="ProjectManager")
+        tasks.append(task)
+    
+    # Sort tasks by priority
+    tasks.sort(key=lambda t: getattr(t, 'priority', 3))
+    
+    # Update project status
+    for task in tasks:
+        project_status["tasks"].append(task.to_dict())
+    
+    # Log the plan creation
+    log_update("ProjectManager", f"Created project plan with {len(tasks)} tasks")
+    for task in tasks:
+        log_update("ProjectManager", f"Task: {task.description} (Assigned to: {task.agent_type})")
+    
+    return tasks
+
+def log_update(agent, message):
+    """Log an update from an agent to the shared memory"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    update = {
+        "timestamp": timestamp,
+        "agent": agent,
+        "message": message
+    }
+    agent_updates.append(update)
+    print(f"[{timestamp}] [{agent}] {message}")
+
+def get_next_task():
+    """Get the next task to be processed based on priority and dependencies"""
+    pending_tasks = []
+    
+    for t in project_status["tasks"]:
+        if t["status"] == "pending":
+            # Create a task with only the basic required fields
+            task = Task(
+                description=t["description"],
+                agent_type=t.get("agent_type"),
+                priority=t.get("priority", 3)
+            )
+            # Set the ID to match the stored task
+            task.id = t["id"]
+            
+            # Set dependencies if they exist
+            if "dependencies" in t:
+                task.dependencies = t["dependencies"]
+                
+            pending_tasks.append(task)
+    
+    # If no tasks are pending, return None
+    if not pending_tasks:
+        return None
+    
+    # Sort by priority (lowest number = highest priority)
+    pending_tasks.sort(key=lambda t: t.priority)
+    
+    # Find the first task with no unmet dependencies
+    for task in pending_tasks:
+        dependencies_met = True
+        
+        # Check if all dependencies are completed
+        if task.dependencies:
+            for dep_id in task.dependencies:
+                dep_completed = False
+                for t in project_status["tasks"]:
+                    if t["id"] == dep_id and t["status"] == "completed":
+                        dep_completed = True
+                        break
+                
+                if not dep_completed:
+                    dependencies_met = False
+                    break
+        
+        if dependencies_met:
+            return task
+    
+    # If no tasks have all dependencies met, return the highest priority task
+    return pending_tasks[0]
+
+def update_project_progress():
+    """Update the project progress percentage"""
+    total_tasks = len(project_status["tasks"])
+    if total_tasks == 0:
+        project_status["progress"] = 0
+        return
+    
+    completed_tasks = sum(1 for t in project_status["tasks"] if t["status"] == "completed")
+    project_status["progress"] = int((completed_tasks / total_tasks) * 100)
+    project_status["last_update"] = datetime.now()
+
+def worker_thread():
+    """Background worker thread that processes tasks"""
+    global system_running
+    
+    while system_running:
+        try:
+            # If there are no tasks in the queue, check if we need to get a new one
+            if task_queue.empty():
+                next_task = get_next_task()
+                if next_task:
+                    task_queue.put(next_task)
+            
+            # Try to get a task with a 5-second timeout
+            task = task_queue.get(timeout=5)
+            
+            # Process the task
+            process_task(task)
+            
+            # Update the corresponding task in project_status
+            for i, t in enumerate(project_status["tasks"]):
+                if t["id"] == task.id:
+                    project_status["tasks"][i] = task.to_dict()
+                    break
+            
+            # Update project progress
+            update_project_progress()
+            
+            # Mark task as done
+            task_queue.task_done()
+            
+        except queue.Empty:
+            # No tasks in queue, sleep briefly
+            time.sleep(1)
+        except Exception as e:
+            # Log any errors
+            log_update("System", f"Error in worker thread: {str(e)}")
+            time.sleep(5)  # Sleep longer after an error to avoid rapid error loops
+
+# Flask routes
 @app.route('/')
 def home():
-    return jsonify({"status": "API is running"})
+    return jsonify({"status": "Async Multi-Agent System is running"})
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
+    global system_running, project_status
+    
     data = request.json
     user_message = data.get('message', '')
     
     if not user_message:
         return jsonify({'error': 'No message provided'}), 400
     
-    response = agent.run(user_message)
+    # Log the user message
+    log_update("User", user_message)
+    
+    # Check for system commands
+    if user_message.lower().startswith("start project:") or user_message.lower().startswith("create project:"):
+        # Extract project description
+        project_description = user_message.split(":", 1)[1].strip()
+        
+        # Stop any existing project
+        system_running = False
+        time.sleep(1)  # Give worker thread time to clean up
+        
+        # Create a new project plan
+        tasks = create_project_plan(project_description)
+        
+        # Start the worker thread if not already running
+        system_running = True
+        worker = threading.Thread(target=worker_thread)
+        worker.daemon = True
+        worker.start()
+        
+        # Response for the user
+        task_list = "\n".join([f"- {task.description} → {task.agent_type}" for task in tasks])
+        response = f"""[ProjectManager] I've analyzed your project and created a plan with {len(tasks)} tasks:
+
+{task_list}
+
+The team is now working on these tasks. You can check progress by asking for a status update."""
+
+    elif user_message.lower().startswith("stop") or user_message.lower() == "stop":
+        # Stop the worker thread
+        system_running = False
+        response = "[System] Project has been stopped. All agents have ceased working."
+    
+    elif "status" in user_message.lower() or "progress" in user_message.lower():
+        # Provide a status update
+        update_project_progress()
+        
+        completed = sum(1 for t in project_status["tasks"] if t["status"] == "completed")
+        in_progress = sum(1 for t in project_status["tasks"] if t["status"] == "in_progress")
+        pending = sum(1 for t in project_status["tasks"] if t["status"] == "pending")
+        total = len(project_status["tasks"])
+        
+        # Get the most recent updates from each agent
+        recent_updates = {}
+        for update in reversed(agent_updates[-20:]):  # Look through the last 20 updates
+            agent = update["agent"]
+            if agent not in recent_updates and agent != "User" and agent != "System":
+                recent_updates[agent] = update
+            if len(recent_updates) >= 4:  # We have updates from all 4 agent types
+                break
+        
+        status_msg = f"""[ProjectManager] Project Status:
+- Progress: {project_status["progress"]}% complete
+- Tasks: {completed}/{total} completed, {in_progress} in progress, {pending} pending
+
+Recent agent activities:
+"""
+        for agent, update in recent_updates.items():
+            status_msg += f"- {agent}: {update['message']}\n"
+        
+        if in_progress > 0:
+            status_msg += "\nCurrently working on:\n"
+            for task in project_status["tasks"]:
+                if task["status"] == "in_progress":
+                    status_msg += f"- {task['description']} (Assigned to: {task['agent_type']})\n"
+        
+        response = status_msg
+    
+    elif any(agent in user_message.lower() for agent in ["projectmanager", "frontenddev", "backenddev", "contentwriter"]):
+        # Direct question to a specific agent
+        for agent_type in ["ProjectManager", "FrontendDev", "BackendDev", "ContentWriter"]:
+            if agent_type.lower() in user_message.lower():
+                # Create a prompt for this agent
+                system_prompt = AGENT_TYPES[agent_type]["system_prompt"]
+                prompt = f"""
+{system_prompt}
+
+Project Context:
+{project_status["description"]}
+
+The user is asking you directly: {user_message}
+
+Respond as {agent_type} with your expertise. Focus on giving a helpful, informative response.
+"""
+                # Call the LLM
+                agent_response = call_llm([{"role": "system", "content": prompt}])
+                response = f"[{agent_type}] {agent_response}"
+                break
+    else:
+        # General question or instruction - route to Project Manager
+        system_prompt = AGENT_TYPES["ProjectManager"]["system_prompt"]
+        prompt = f"""
+{system_prompt}
+
+Current Project Context:
+{project_status["description"]}
+
+The user says: {user_message}
+
+Respond as the Project Manager. If this is a new instruction, explain how you'll integrate it into the project plan.
+If it's a question, provide a helpful response based on the current project state.
+"""
+        # Call the LLM
+        agent_response = call_llm([{"role": "system", "content": prompt}])
+        response = f"[ProjectManager] {agent_response}"
+    
+    # Log the response
+    log_update("System", response)
     
     return jsonify({
         'response': response,
-        'history': agent.memory.get_chat_history()
+        'updates': agent_updates[-10:],  # Return the last 10 updates
+        'project_status': {
+            'description': project_status["description"],
+            'progress': project_status["progress"],
+            'tasks_completed': sum(1 for t in project_status["tasks"] if t["status"] == "completed"),
+            'tasks_total': len(project_status["tasks"])
+        }
     })
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
+    global document_context
+    
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
     
@@ -345,12 +783,13 @@ def upload_file():
     try:
         extracted_text = DocumentProcessor.process_document(file_data, file_type)
         
-        # Truncate if too long (consider more sophisticated handling in production)
+        # Truncate if too long
         max_length = 5000
         if len(extracted_text) > max_length:
             extracted_text = extracted_text[:max_length] + f"\n[Note: Document truncated from {len(extracted_text)} characters to {max_length} characters]"
         
-        agent.set_document_context(extracted_text)
+        document_context = extracted_text
+        log_update("System", f"Document uploaded: {file.filename} ({len(extracted_text)} characters)")
         
         return jsonify({
             'success': True,
@@ -362,10 +801,56 @@ def upload_file():
 
 @app.route('/api/clear', methods=['POST'])
 def clear_conversation():
-    agent.memory.clear()
-    agent.clear_document_context()
+    global system_running, agent_updates, project_status, document_context
+    
+    # Stop the worker thread
+    system_running = False
+    time.sleep(1)  # Give worker thread time to clean up
+    
+    # Clear all data
+    agent_updates = []
+    document_context = ""
+    project_status = {
+        "description": "",
+        "tasks": [],
+        "progress": 0,
+        "start_time": None,
+        "last_update": None
+    }
+    
+    log_update("System", "System has been reset. All progress has been cleared.")
+    
     return jsonify({'success': True})
 
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    update_project_progress()
+    
+    return jsonify({
+        'project': {
+            'description': project_status["description"],
+            'progress': project_status["progress"],
+            'tasks_completed': sum(1 for t in project_status["tasks"] if t["status"] == "completed"),
+            'tasks_total': len(project_status["tasks"]),
+            'start_time': project_status["start_time"].strftime("%Y-%m-%d %H:%M:%S") if project_status["start_time"] else None,
+            'last_update': project_status["last_update"].strftime("%Y-%m-%d %H:%M:%S") if project_status["last_update"] else None,
+        },
+        'tasks': project_status["tasks"],
+        'updates': agent_updates[-20:],  # Return the last 20 updates
+        'running': system_running
+    })
+
+@app.route('/api/logs', methods=['GET'])
+def get_logs():
+    """Get the console logs for display in the web UI"""
+    # Get the last 100 logs
+    logs = agent_updates[-100:] if agent_updates else []
+    
+    return jsonify({
+        'logs': logs,
+        'total_logs': len(agent_updates)
+    })
+    
 if __name__ == '__main__':
-    print("Starting AI Agent Web Interface on http://127.0.0.1:5001")
+    print("Starting Asynchronous Multi-Agent System on http://127.0.0.1:5001")
     app.run(debug=True, host='0.0.0.0', port=5001)

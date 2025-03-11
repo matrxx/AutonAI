@@ -3,26 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple AI Agent</title>
+    <title>Autonomous Multi-Agent System</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="container">
-        <h1>AI Agent</h1>
+        <div class="header">
+            <h1>Autonomous Multi-Agent System</h1>
+        </div>
+        
+        <div class="project-status">
+            <h3>Project Status</h3>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" id="progress-bar-fill" style="width: 0%"></div>
+                </div>
+                <div class="progress-text" id="progress-text">No active project</div>
+            </div>
+        </div>
         
         <div class="upload-section">
-            <h3>Upload Document</h3>
+            <h3>Upload Document for Agents to Reference</h3>
             <input type="file" id="file-upload" accept=".pdf,.docx,.txt">
             <button id="upload-button">Upload</button>
             <div id="file-info"></div>
         </div>
         
-        <div class="chat-container" id="chat-container"></div>
+        <div class="chat-container" id="chat-container">
+            <!-- Messages will be dynamically inserted here -->
+        </div>
         
         <div class="input-section">
-            <input type="text" id="user-input" placeholder="Type your message here...">
+            <input type="text" id="user-input" placeholder="Describe your project or ask a question...">
             <button id="send-button">Send</button>
-            <button id="clear-button">Clear</button>
+        </div>
+        
+        <div class="controls">
+            <button id="status-button">Get Status Update</button>
+            <button id="toggle-console-button">Show Console</button>
+            <button id="clear-button">Reset System</button>
+        </div>
+        
+        <!-- Console Section (hidden by default) -->
+        <div class="console-container" id="console-container" style="display: none;">
+            <div class="console-header">
+                <h3>System Console</h3>
+                <div class="console-controls">
+                    <label><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label>
+                    <button id="refresh-console-button">Refresh</button>
+                </div>
+            </div>
+            <div class="console-output" id="console-output">
+                <!-- Console output will be inserted here -->
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>How to use the Autonomous Multi-Agent System:</h3>
+            <ul>
+                <li><strong>Start a project:</strong> Type "start project: [your project description]" to begin</li>
+                <li><strong>Get status updates:</strong> Click the "Get Status Update" button or ask "What's the current status?"</li>
+                <li><strong>Talk to specific agents:</strong> Address them by name (e.g., "FrontendDev, create a responsive navbar")</li>
+                <li><strong>Upload documents:</strong> Provide additional context or requirements for your project</li>
+                <li><strong>View console:</strong> Click "Show Console" to see detailed system logs</li>
+                <li><strong>Reset the system:</strong> Click the "Reset System" button to clear agent memories and start fresh</li>
+            </ul>
+            <p><strong>Example:</strong> start project: Create a landing page for an Italian restaurant with information about their menu, location, and a reservation form</p>
         </div>
     </div>
     
