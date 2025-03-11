@@ -11,6 +11,7 @@
 # Roadmap:
 
 --> Better website design
+
   --> Charge bar for the project in real time
   --> Better button localization
   --> Night mode
