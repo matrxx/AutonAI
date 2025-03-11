@@ -44,3 +44,12 @@
   --> Try a better LLM to upgrade the overall AI framework of AutonAI
   
   --> Optimize it for the multiple agent tasks
+  
+
+• And more
+
+--> Multi language support
+
+--> Tools integration (jobs focus optimized)
+
+--> Preview of the work done
