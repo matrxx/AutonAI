@@ -32,7 +32,7 @@
   
   --> Fix the fetching errors 🛠️
   
-  --> Fix the "tool" error 🛠️
+  --> Fix the "tool" error ☑️
   
 
 • Better autonomous agents
