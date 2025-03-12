@@ -14,7 +14,7 @@
 
 • Better website design
 
-  --> Charge bar for the project in real time
+  --> Charge bar for the project updates in real time
   
   --> Better webste ergonomy (button placement/size, responsive, etc)
   
