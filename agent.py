@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
+import mimetypes
 from flask_cors import CORS
 import os
 import json
@@ -342,6 +343,56 @@ Project Context:
     
     return prompt
 
+# Create a directory to store agent outputs
+OUTPUT_DIR = 'agent_outputs'
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+
+def save_output_file(agent_type, file_name, content, file_type='text'):
+    """Save agent output as a file that can be downloaded later"""
+    # Create agent-specific folder if it doesn't exist
+    agent_dir = os.path.join(OUTPUT_DIR, agent_type)
+    if not os.path.exists(agent_dir):
+        os.makedirs(agent_dir)
+    
+    # Sanitize file name (remove spaces and special characters)
+    safe_name = "".join([c for c in file_name if c.isalnum() or c in "._-"]).strip()
+    if not safe_name:
+        safe_name = "output"
+    
+    # Add timestamp to prevent overwriting
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Determine file extension based on content and type
+    extension = ".txt"  # Default
+    
+    # Use proper extension based on file_type or content detection
+    if file_type == 'html' or content.strip().startswith('<') and content.find('</html>') > 0:
+        extension = ".html"
+    elif file_type == 'css' or content.find('@media') > 0 or content.find('{') > 0 and content.find('}') > 0:
+        extension = ".css"
+    elif file_type == 'js' or 'function(' in content or 'const ' in content or 'let ' in content:
+        extension = ".js"
+    elif file_type == 'json' or (content.strip().startswith('{') and content.strip().endswith('}')):
+        extension = ".json"
+    
+    # Create full file name with timestamp and extension
+    full_name = f"{timestamp}_{safe_name}{extension}"
+    file_path = os.path.join(agent_dir, full_name)
+    
+    # Write content to file
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    
+    return {
+        'path': file_path,
+        'name': os.path.basename(file_path),
+        'agent': agent_type,
+        'timestamp': timestamp,
+        'size': len(content),
+        'type': extension[1:]  # Remove the dot
+    }
+
 def process_task(task):
     """Process a single task using the appropriate agent"""
     agent_type = task.agent_type
@@ -437,6 +488,44 @@ def process_task(task):
     # Mark task as completed
     task.update_status("completed", f"Task completed by {agent_type}")
     log_update(agent_type, f"Completed task: {task.description}")
+    
+    # Add file saving functionality
+    if task.result:
+        # Try to detect content type from task description and result content
+        file_type = 'text'
+        
+        # Check task description for clues about file type
+        desc_lower = task.description.lower()
+        
+        if 'html' in desc_lower or 'webpage' in desc_lower or 'web page' in desc_lower:
+            file_type = 'html'
+        elif 'css' in desc_lower or 'style' in desc_lower:
+            file_type = 'css'
+        elif 'javascript' in desc_lower or 'js' in desc_lower:
+            file_type = 'js'
+        elif 'json' in desc_lower:
+            file_type = 'json'
+        
+        # Also check content for patterns
+        content = task.result
+        if file_type == 'text':  # Only do content detection if type not already determined
+            if content.strip().startswith('<') and ('</html>' in content or '</body>' in content):
+                file_type = 'html'
+            elif '{' in content and '}' in content and (':' in content or '@media' in content or '@keyframes' in content):
+                file_type = 'css'
+            elif ('function(' in content or 'const ' in content or 'let ' in content or 'var ' in content) and (';' in content):
+                file_type = 'js'
+            elif content.strip().startswith('{') and content.strip().endswith('}'):
+                file_type = 'json'
+        
+        # Create a suitable filename from the task description
+        file_name = task.description[:30].replace(' ', '_')
+        
+        # Save the output as a file
+        file_info = save_output_file(task.agent_type, file_name, task.result, file_type)
+        task.file_info = file_info
+        
+        log_update(agent_type, f"Output saved as file: {file_info['name']}")
     
     # Return the result
     return task.result
@@ -874,3 +963,73 @@ def get_logs():
 if __name__ == '__main__':
     print("Starting Asynchronous Multi-Agent System on http://127.0.0.1:5001")
     app.run(debug=True, host='0.0.0.0', port=5001)
+
+@app.route('/api/files', methods=['GET'])
+def list_files():
+    """List all output files created by agents"""
+    files = []
+    
+    if os.path.exists(OUTPUT_DIR):
+        for agent_type in os.listdir(OUTPUT_DIR):
+            agent_dir = os.path.join(OUTPUT_DIR, agent_type)
+            if os.path.isdir(agent_dir):
+                for file_name in os.listdir(agent_dir):
+                    file_path = os.path.join(agent_dir, file_name)
+                    if os.path.isfile(file_path):
+                        # Get the relative path for the frontend
+                        rel_path = os.path.join(agent_type, file_name).replace('\\', '/')
+                        
+                        files.append({
+                            'name': file_name,
+                            'agent': agent_type,
+                            'path': rel_path,
+                            'size': os.path.getsize(file_path),
+                            'timestamp': datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M:%S"),
+                            'type': os.path.splitext(file_name)[1][1:]  # Get extension without dot
+                        })
+    
+    # Sort by timestamp (newest first)
+    files.sort(key=lambda x: x['timestamp'], reverse=True)
+    
+    return jsonify({'files': files})
+
+@app.route('/api/files/<path:file_path>', methods=['GET'])
+def download_file(file_path):
+    """Download a specific file"""
+    # Sanitize the path to prevent directory traversal
+    safe_path = os.path.normpath(file_path).lstrip('./\\')
+    full_path = os.path.join(OUTPUT_DIR, safe_path)
+    
+    if os.path.exists(full_path) and os.path.isfile(full_path):
+        # Get the correct MIME type
+        content_type = mimetypes.guess_type(full_path)[0] or 'application/octet-stream'
+        
+        # Serve the file
+        return send_file(full_path, mimetype=content_type, as_attachment=True)
+    else:
+        return jsonify({'error': 'File not found'}), 404
+
+@app.route('/api/debug', methods=['GET'])
+def debug_endpoints():
+    """Debug endpoint to list all registered routes"""
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': [method for method in rule.methods if method != 'OPTIONS' and method != 'HEAD'],
+            'path': str(rule)
+        })
+    
+    # Check if OUTPUT_DIR exists and is accessible
+    output_dir_exists = os.path.exists(OUTPUT_DIR)
+    output_dir_files = []
+    if output_dir_exists:
+        for root, dirs, files in os.walk(OUTPUT_DIR):
+            for file in files:
+                output_dir_files.append(os.path.join(root, file).replace('\\', '/'))
+    
+    return jsonify({
+        'routes': routes,
+        'output_dir_exists': output_dir_exists,
+        'output_dir_files': output_dir_files
+    })

@@ -8,6 +8,11 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- Simplified theme toggle button -->
+<div class="theme-toggle-wrapper">
+    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode"></button>
+</div>
+    </div>
     <div class="container">
         <div class="header">
             <h1>AutonAI</h1>
@@ -42,7 +47,18 @@
         <div class="controls">
             <button id="status-button">Get Status Update</button>
             <button id="toggle-console-button">Show Console</button>
+            <button id="toggle-files-button">Show Files</button>
             <button id="clear-button">Reset System</button>
+        </div>
+
+        <div class="files-container" id="files-container" style="display: none;">
+            <div class="files-header">
+                <h3>Generated Files</h3>
+                <button id="refresh-files-button">Refresh Files</button>
+            </div>
+            <div class="files-list" id="files-list">
+                <!-- Files will be listed here -->
+            </div>
         </div>
         
         <!-- Console Section (hidden by default) -->

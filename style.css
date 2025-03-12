@@ -224,7 +224,6 @@ button:hover {
 
 #status-button {
     background-color: #ff9800;
-    display: none;
 }
 
 #status-button:hover {
@@ -314,8 +313,6 @@ code {
     border-radius: 10px;
     background-color: #e9ecef;
 }
-
-/* Add these styles at the end of your existing style.css file */
 
 /* Console Styling */
 .console-container {
@@ -441,6 +438,130 @@ code {
     background-color: #333;
 }
 
+/* Files section styling */
+.files-container {
+    background-color: #fff;
+    border-radius: 5px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.files-header {
+    background-color: #f5f5f5;
+    padding: 10px 15px;
+    border-radius: 5px 5px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.files-header h3 {
+    margin: 0;
+}
+
+.files-list {
+    padding: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-info {
+    flex: 1;
+}
+
+.file-name {
+    font-weight: bold;
+}
+
+.file-meta {
+    font-size: 12px;
+    color: #666;
+}
+
+.file-download {
+    margin-left: 15px;
+}
+
+.file-download a {
+    display: inline-block;
+    padding: 5px 10px;
+    background-color: #4CAF50;
+    color: white;
+    text-decoration: none;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.file-download a:hover {
+    background-color: #45a049;
+}
+
+/* Simplified theme toggle styling without icons */
+.theme-toggle-wrapper {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.theme-toggle {
+    width: 50px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    background-color: #ccc;
+    cursor: pointer;
+    position: relative;
+    outline: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: background-color 0.3s ease;
+}
+
+body.dark-mode .theme-toggle {
+    background-color: #444;
+}
+
+/* Slider thumb */
+.theme-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background-color: white;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+body.dark-mode .theme-toggle::after {
+    transform: translateX(26px);
+}
+
+/* Hover states */
+.theme-toggle:hover {
+    background-color: #bbb;
+}
+
+body.dark-mode .theme-toggle:hover {
+    background-color: #555;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
     .container {
@@ -459,4 +580,80 @@ code {
     button {
         width: 100%;
     }
+    
+    .theme-toggle-wrapper {
+        top: 10px;
+        right: 10px;
+    }
+}
+
+/* Dark mode styles */
+body.dark-mode {
+    background-color: #121212;
+    color: #e0e0e0;
+}
+
+body.dark-mode .container {
+    background-color: #121212;
+}
+
+body.dark-mode .project-status,
+body.dark-mode .upload-section,
+body.dark-mode .chat-container,
+body.dark-mode .instructions,
+body.dark-mode .files-container {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+body.dark-mode .files-header {
+    background-color: #2a2a2a;
+}
+
+body.dark-mode .file-item {
+    border-bottom-color: #333;
+}
+
+body.dark-mode .file-meta {
+    color: #aaa;
+}
+
+body.dark-mode input[type="text"] {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+    border-color: #444;
+}
+
+body.dark-mode .message.user {
+    background-color: #1a3a4a;
+}
+
+body.dark-mode .message.system {
+    background-color: #2a2a2a;
+    color: #aaa;
+}
+
+body.dark-mode .message.agent {
+    background-color: #2a2a2a;
+}
+
+body.dark-mode .agent-projectmanager {
+    border-left-color: #4a6fa5;
+    background-color: #1a2a3a;
+}
+
+body.dark-mode .agent-frontenddev {
+    border-left-color: #28a745;
+    background-color: #1a2a1a;
+}
+
+body.dark-mode .agent-backenddev {
+    border-left-color: #6f42c1;
+    background-color: #2a1a3a;
+}
+
+body.dark-mode .agent-contentwriter {
+    border-left-color: #fd7e14;
+    background-color: #2a1a1a;
 }

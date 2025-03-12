@@ -14,6 +14,12 @@ const consoleContainer = document.getElementById('console-container');
 const consoleOutput = document.getElementById('console-output');
 const refreshConsoleButton = document.getElementById('refresh-console-button');
 const autoScrollCheckbox = document.getElementById('auto-scroll');
+const filesContainer = document.getElementById('files-container');
+const filesList = document.getElementById('files-list');
+const toggleFilesButton = document.getElementById('toggle-files-button');
+const refreshFilesButton = document.getElementById('refresh-files-button');
+const toggleThemeButton = document.getElementById('toggle-theme-button');
+const themeToggle = document.getElementById('theme-toggle');
 
 // Configuration
 const API_BASE_URL = 'http://127.0.0.1:5001';
@@ -29,6 +35,8 @@ let consoleVisible = false;
 let consolePollingInterval = null;
 let lastSeenLogTimestamp = null;
 let consecutiveErrors = 0;
+let filesVisible = false;
+let darkMode = false;
 
 // Event Listeners
 sendButton.addEventListener('click', sendMessage);
@@ -42,6 +50,106 @@ uploadButton.addEventListener('click', uploadFile);
 statusButton.addEventListener('click', requestStatusUpdate);
 toggleConsoleButton.addEventListener('click', toggleConsole);
 refreshConsoleButton.addEventListener('click', fetchConsoleLogs);
+toggleFilesButton.addEventListener('click', toggleFiles);
+refreshFilesButton.addEventListener('click', fetchFiles);
+themeToggle.addEventListener('click', toggleTheme);
+
+// Toggle files visibility
+function toggleFiles() {
+    filesVisible = !filesVisible;
+    
+    if (filesVisible) {
+        filesContainer.style.display = 'block';
+        toggleFilesButton.textContent = 'Hide Files';
+        toggleFilesButton.classList.add('active');
+        fetchFiles();
+    } else {
+        filesContainer.style.display = 'none';
+        toggleFilesButton.textContent = 'Show Files';
+        toggleFilesButton.classList.remove('active');
+    }
+}
+
+// Update the fetchFiles function
+function fetchFiles() {
+    fetch(`${API_BASE_URL}/api/files`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.files && data.files.length > 0) {
+                filesList.innerHTML = '';
+                
+                for (const file of data.files) {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    
+                    // Set file icon based on type
+                    let fileIcon = '📄';
+                    if (file.type === 'html') fileIcon = '🌐';
+                    else if (file.type === 'css') fileIcon = '🎨';
+                    else if (file.type === 'js') fileIcon = '⚙️';
+                    
+                    fileItem.innerHTML = `
+                        <div class="file-info">
+                            <div class="file-name">${fileIcon} ${file.name}</div>
+                            <div class="file-meta">
+                                Created by ${file.agent} on ${file.timestamp} • ${formatFileSize(file.size)}
+                            </div>
+                        </div>
+                        <div class="file-download">
+                            <a href="${API_BASE_URL}/api/files/${file.path}" download="${file.name}">Download</a>
+                        </div>
+                    `;
+                    
+                    filesList.appendChild(fileItem);
+                }
+            } else {
+                filesList.innerHTML = '<div class="no-files">No files available yet. The agents will save their outputs as files automatically.</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching files:', error);
+            filesList.innerHTML = '<div class="error">Error loading files. Make sure the backend server is running.</div>';
+        });
+}
+
+// Format file size
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' bytes';
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    else return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// Toggle dark mode
+function toggleTheme() {
+    darkMode = !darkMode;
+    
+    if (darkMode) {
+        document.body.classList.add('dark-mode');
+    } else {
+        document.body.classList.remove('dark-mode');
+    }
+    
+    // Save preference
+    localStorage.setItem('darkMode', darkMode);
+}
+
+// Check for saved theme preference
+function loadSavedTheme() {
+    const savedMode = localStorage.getItem('darkMode');
+    if (savedMode === 'true') {
+        darkMode = true;
+        document.body.classList.add('dark-mode');
+        toggleThemeButton.textContent = 'Light Mode';
+    }
+}
+
+// Call this when the page loads
+loadSavedTheme();
 
 // Update fetchConsoleLogs to be more resilient
 function fetchConsoleLogs() {
