@@ -54,4 +54,8 @@
 
 --> Tools integration (jobs focus optimized)
 
---> Preview of the work done
+--> Multi AI powered interconnected tools for IT (graphana, kibana, elasticsearch, powerBI, etc..)
+
+--> Multi AI powered interconnected tools for collaboration tools (teams, slack, trello, etc...)
+
+--> Preview of the work done in real time
