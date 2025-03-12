@@ -16,11 +16,11 @@
 
   --> Charge bar for the project in real time
   
-  --> Better button localization
+  --> Better webste ergonomy (button placement/size, responsive, etc)
   
-  --> Night mode
+  --> Night mode 🛠️
   
-  --> Branding (logo, identity, favicon, font)
+  --> Branding (logo, identity, favicon, font) 🛠️
   
   --> Animated? (agents tasks representations) *secondary*
   
@@ -29,16 +29,16 @@
 
   --> Upgrade the console looks
   
-  --> Fix the fetching errors
+  --> Fix the fetching errors 🛠️
   
-  --> Fix the "tool" error
+  --> Fix the "tool" error 🛠️
   
 
 • Better autonomous agents
 
-  --> Fix the problems and make everything working as intended
+  --> Fix the problems and make everything working as intended 🛠️
   
-  --> Make them upload the final render on the web to get the work
+  --> Make them upload the final render on the web to get the work 🛠️
   
 
 • Better LLM
