@@ -46,6 +46,8 @@
   --> Try a better LLM to upgrade the overall AI framework of AutonAI
   
   --> Optimize it for the multiple agent tasks
+
+  --> Multi LLM integration to make them interact
   
 
 • And more
