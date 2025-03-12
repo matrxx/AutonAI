@@ -18,7 +18,7 @@
   
   --> Better webste ergonomy (button placement/size, responsive, etc)
   
-  --> Night mode 🛠️
+  --> Night mode ☑️
   
   --> Branding (logo, identity, favicon, font) 🛠️
   
