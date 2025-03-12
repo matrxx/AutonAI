@@ -348,6 +348,8 @@ OUTPUT_DIR = 'agent_outputs'
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
+# Improved file saving function for agent.py
+
 def save_output_file(agent_type, file_name, content, file_type='text'):
     """Save agent output as a file that can be downloaded later"""
     # Create agent-specific folder if it doesn't exist
@@ -366,8 +368,17 @@ def save_output_file(agent_type, file_name, content, file_type='text'):
     # Determine file extension based on content and type
     extension = ".txt"  # Default
     
+    # Extract code blocks if present
+    code_block_pattern = r'```(?:\w+)?\s*([\s\S]+?)\s*```'
+    code_blocks = re.findall(code_block_pattern, content)
+    
+    # If we found code blocks, use the first one as content (if appropriate)
+    extracted_content = content
+    if code_blocks and ('html' in file_type.lower() or 'css' in file_type.lower() or 'js' in file_type.lower()):
+        extracted_content = code_blocks[0]
+    
     # Use proper extension based on file_type or content detection
-    if file_type == 'html' or content.strip().startswith('<') and content.find('</html>') > 0:
+    if file_type == 'html' or content.strip().startswith('<') and ('</html>' in content or '</body>' in content):
         extension = ".html"
     elif file_type == 'css' or content.find('@media') > 0 or content.find('{') > 0 and content.find('}') > 0:
         extension = ".css"
@@ -380,16 +391,16 @@ def save_output_file(agent_type, file_name, content, file_type='text'):
     full_name = f"{timestamp}_{safe_name}{extension}"
     file_path = os.path.join(agent_dir, full_name)
     
-    # Write content to file
+    # Write content to file (use the extracted content if available)
     with open(file_path, 'w', encoding='utf-8') as f:
-        f.write(content)
+        f.write(extracted_content)
     
     return {
         'path': file_path,
         'name': os.path.basename(file_path),
         'agent': agent_type,
         'timestamp': timestamp,
-        'size': len(content),
+        'size': len(extracted_content),
         'type': extension[1:]  # Remove the dot
     }
 
@@ -489,24 +500,23 @@ def process_task(task):
     task.update_status("completed", f"Task completed by {agent_type}")
     log_update(agent_type, f"Completed task: {task.description}")
     
-    # Add file saving functionality
+    # Enhanced file saving functionality
     if task.result:
-        # Try to detect content type from task description and result content
-        file_type = 'text'
-        
         # Check task description for clues about file type
         desc_lower = task.description.lower()
+        file_type = 'text'
         
-        if 'html' in desc_lower or 'webpage' in desc_lower or 'web page' in desc_lower:
+        # More aggressive file type detection
+        if any(term in desc_lower for term in ['html', 'webpage', 'web page', 'landing page', 'site']):
             file_type = 'html'
-        elif 'css' in desc_lower or 'style' in desc_lower:
+        elif any(term in desc_lower for term in ['css', 'style', 'stylesheet']):
             file_type = 'css'
-        elif 'javascript' in desc_lower or 'js' in desc_lower:
+        elif any(term in desc_lower for term in ['javascript', 'js', 'script', 'interactive']):
             file_type = 'js'
-        elif 'json' in desc_lower:
+        elif any(term in desc_lower for term in ['json', 'api response', 'data format']):
             file_type = 'json'
         
-        # Also check content for patterns
+        # Also check content for patterns if type still undetermined
         content = task.result
         if file_type == 'text':  # Only do content detection if type not already determined
             if content.strip().startswith('<') and ('</html>' in content or '</body>' in content):
@@ -518,14 +528,54 @@ def process_task(task):
             elif content.strip().startswith('{') and content.strip().endswith('}'):
                 file_type = 'json'
         
+        # Extract code blocks if present
+        code_block_pattern = r'```(?:\w+)?\s*([\s\S]+?)\s*```'
+        code_blocks = re.findall(code_block_pattern, content)
+        
+        # Use the extracted content if appropriate
+        extracted_content = content
+        if code_blocks and file_type != 'text':
+            extracted_content = code_blocks[0]
+            
+            # Clean up any remaining markdown code fences
+            extracted_content = re.sub(r'^```\w*\s*', '', extracted_content)
+            extracted_content = re.sub(r'\s*```$', '', extracted_content)
+        
         # Create a suitable filename from the task description
-        file_name = task.description[:30].replace(' ', '_')
+        file_name = re.sub(r'[^\w\s.-]', '', task.description[:40]).strip()
+        file_name = re.sub(r'\s+', '_', file_name)
         
         # Save the output as a file
-        file_info = save_output_file(task.agent_type, file_name, task.result, file_type)
+        file_info = save_output_file(task.agent_type, file_name, extracted_content, file_type)
         task.file_info = file_info
         
         log_update(agent_type, f"Output saved as file: {file_info['name']}")
+        
+        # Also check for additional code blocks to save as separate files
+        code_block_pattern = r'```(\w+)\s*([\s\S]+?)\s*```'
+        code_blocks = re.findall(code_block_pattern, task.result)
+        
+        for i, (language, code) in enumerate(code_blocks):
+            # Skip if this is likely the main file we already saved
+            if i == 0 and file_type != 'text' and language.lower() in file_type:
+                continue
+                
+            # Determine file type from language
+            block_file_type = 'text'
+            if language.lower() in ['html', 'xml']:
+                block_file_type = 'html'
+            elif language.lower() in ['css']:
+                block_file_type = 'css'
+            elif language.lower() in ['javascript', 'js']:
+                block_file_type = 'js'
+            elif language.lower() in ['json']:
+                block_file_type = 'json'
+                
+            # Save this code block as a separate file
+            block_file_name = f"{file_name}_part{i+1}"
+            block_file_info = save_output_file(task.agent_type, block_file_name, code, block_file_type)
+            
+            log_update(agent_type, f"Additional output saved: {block_file_info['name']}")
     
     # Return the result
     return task.result

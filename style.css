@@ -657,3 +657,167 @@ body.dark-mode .agent-contentwriter {
     border-left-color: #fd7e14;
     background-color: #2a1a1a;
 }
+
+/* Enhanced file display styling */
+
+.agent-files-section {
+    margin-bottom: 20px;
+}
+
+.agent-files-header {
+    padding: 8px 12px;
+    font-weight: bold;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.agent-files-header h4 {
+    margin: 0;
+}
+
+.agent-frontenddev {
+    background-color: #e8f5e9;
+    color: #28a745;
+}
+
+.agent-backenddev {
+    background-color: #f3ebff;
+    color: #6f42c1;
+}
+
+.agent-contentwriter {
+    background-color: #fff9f0;
+    color: #fd7e14;
+}
+
+.agent-projectmanager {
+    background-color: #eef2f8;
+    color: #4a6fa5;
+}
+
+.file-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.preview-button, .download-button {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 14px;
+    text-decoration: none;
+    color: white;
+}
+
+.preview-button {
+    background-color: #17a2b8;
+}
+
+.preview-button:hover {
+    background-color: #138496;
+}
+
+.download-button {
+    background-color: #4CAF50;
+}
+
+.download-button:hover {
+    background-color: #45a049;
+}
+
+.preview-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.preview-modal-content {
+    background-color: white;
+    width: 80%;
+    height: 80%;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.preview-modal-header h4 {
+    margin: 0;
+}
+
+.close-preview-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #555;
+}
+
+.preview-modal-body {
+    flex-grow: 1;
+    padding: 15px;
+    overflow: hidden;
+}
+
+.preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #eee;
+}
+
+/* Loading indicator */
+.loading-files {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+}
+
+/* Dark mode adjustments */
+body.dark-mode .agent-frontenddev {
+    background-color: #1a2a1a;
+}
+
+body.dark-mode .agent-backenddev {
+    background-color: #2a1a3a;
+}
+
+body.dark-mode .agent-contentwriter {
+    background-color: #2a1a1a;
+}
+
+body.dark-mode .agent-projectmanager {
+    background-color: #1a2a3a;
+}
+
+body.dark-mode .preview-modal-content {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+}
+
+body.dark-mode .preview-modal-header {
+    border-bottom-color: #333;
+}
+
+body.dark-mode .close-preview-button {
+    color: #aaa;
+}
+
+body.dark-mode .preview-iframe {
+    border-color: #333;
+    background-color: white;
+}

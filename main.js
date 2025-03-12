@@ -70,8 +70,11 @@ function toggleFiles() {
     }
 }
 
-// Update the fetchFiles function
+// Enhanced fetchFiles function for main.js
 function fetchFiles() {
+    // Show loading state
+    filesList.innerHTML = '<div class="loading-files">Loading files...</div>';
+    
     fetch(`${API_BASE_URL}/api/files`)
         .then(response => {
             if (!response.ok) {
@@ -81,32 +84,81 @@ function fetchFiles() {
         })
         .then(data => {
             if (data.files && data.files.length > 0) {
-                filesList.innerHTML = '';
+                // Group files by agent
+                const filesByAgent = {};
                 
                 for (const file of data.files) {
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'file-item';
-                    
-                    // Set file icon based on type
-                    let fileIcon = '📄';
-                    if (file.type === 'html') fileIcon = '🌐';
-                    else if (file.type === 'css') fileIcon = '🎨';
-                    else if (file.type === 'js') fileIcon = '⚙️';
-                    
-                    fileItem.innerHTML = `
-                        <div class="file-info">
-                            <div class="file-name">${fileIcon} ${file.name}</div>
-                            <div class="file-meta">
-                                Created by ${file.agent} on ${file.timestamp} • ${formatFileSize(file.size)}
-                            </div>
-                        </div>
-                        <div class="file-download">
-                            <a href="${API_BASE_URL}/api/files/${file.path}" download="${file.name}">Download</a>
-                        </div>
-                    `;
-                    
-                    filesList.appendChild(fileItem);
+                    if (!filesByAgent[file.agent]) {
+                        filesByAgent[file.agent] = [];
+                    }
+                    filesByAgent[file.agent].push(file);
                 }
+                
+                // Clear current list
+                filesList.innerHTML = '';
+                
+                // Create sections for each agent
+                for (const agent in filesByAgent) {
+                    // Create agent section
+                    const agentSection = document.createElement('div');
+                    agentSection.className = 'agent-files-section';
+                    
+                    // Add header
+                    const agentHeader = document.createElement('div');
+                    agentHeader.className = `agent-files-header agent-${agent.toLowerCase()}`;
+                    agentHeader.innerHTML = `<h4>${agent} Files</h4>`;
+                    agentSection.appendChild(agentHeader);
+                    
+                    // Add files
+                    const agentFiles = document.createElement('div');
+                    agentFiles.className = 'agent-files-list';
+                    
+                    for (const file of filesByAgent[agent]) {
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'file-item';
+                        
+                        // Set file icon based on type
+                        let fileIcon = '📄';
+                        if (file.type === 'html') fileIcon = '🌐';
+                        else if (file.type === 'css') fileIcon = '🎨';
+                        else if (file.type === 'js') fileIcon = '⚙️';
+                        else if (file.type === 'json') fileIcon = '📊';
+                        
+                        // Add preview button for HTML files
+                        let previewButton = '';
+                        if (file.type === 'html') {
+                            previewButton = `<a href="#" class="preview-button" data-file="${file.path}">Preview</a>`;
+                        }
+                        
+                        fileItem.innerHTML = `
+                            <div class="file-info">
+                                <div class="file-name">${fileIcon} ${file.name}</div>
+                                <div class="file-meta">
+                                    Created on ${file.timestamp} • ${formatFileSize(file.size)}
+                                </div>
+                            </div>
+                            <div class="file-actions">
+                                ${previewButton}
+                                <a href="${API_BASE_URL}/api/files/${file.path}" download="${file.name}" class="download-button">Download</a>
+                            </div>
+                        `;
+                        
+                        agentFiles.appendChild(fileItem);
+                    }
+                    
+                    agentSection.appendChild(agentFiles);
+                    filesList.appendChild(agentSection);
+                }
+                
+                // Add event listeners for preview buttons
+                document.querySelectorAll('.preview-button').forEach(button => {
+                    button.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const filePath = this.getAttribute('data-file');
+                        previewHtmlFile(filePath);
+                    });
+                });
+                
             } else {
                 filesList.innerHTML = '<div class="no-files">No files available yet. The agents will save their outputs as files automatically.</div>';
             }
@@ -115,6 +167,39 @@ function fetchFiles() {
             console.error('Error fetching files:', error);
             filesList.innerHTML = '<div class="error">Error loading files. Make sure the backend server is running.</div>';
         });
+}
+
+// Function to preview HTML files
+function previewHtmlFile(filePath) {
+    // Create modal dialog
+    const modal = document.createElement('div');
+    modal.className = 'preview-modal';
+    
+    modal.innerHTML = `
+        <div class="preview-modal-content">
+            <div class="preview-modal-header">
+                <h4>HTML Preview</h4>
+                <button class="close-preview-button">&times;</button>
+            </div>
+            <div class="preview-modal-body">
+                <iframe src="${API_BASE_URL}/api/files/${filePath}" class="preview-iframe"></iframe>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Add close button event
+    modal.querySelector('.close-preview-button').addEventListener('click', function() {
+        document.body.removeChild(modal);
+    });
+    
+    // Close on click outside content
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    });
 }
 
 // Format file size
