@@ -45,7 +45,7 @@
 
 • Better LLM
 
-  --> Try a better LLM to upgrade the overall AI framework of AutonAI
+  --> LLM upgrade to boost the overall AI framework of AutonAI (currently implementing Llama3.3) 🛠️
   
   --> Optimize it for the multiple agent tasks
 
