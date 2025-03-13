@@ -236,12 +236,11 @@ function loadSavedTheme() {
 // Call this when the page loads
 loadSavedTheme();
 
-// Update fetchConsoleLogs to be more resilient
 function fetchConsoleLogs() {
-    // Add a notice when starting with no backend
+    // Only show the connecting message if we have no console content
     if (consoleOutput.children.length === 0) {
         consoleOutput.innerHTML = `<div class="console-line">
-            <span class="console-timestamp">${new Date().toISOString()}</span>
+            <span class="console-timestamp">[${new Date().toISOString()}]</span>
             <span class="console-agent console-agent-system">[System]</span>
             <span class="console-message">Connecting to backend server...</span>
         </div>`;
@@ -256,7 +255,7 @@ function fetchConsoleLogs() {
             
             // Clear the initial connecting message if it exists
             if (consoleOutput.children.length === 1 && 
-                consoleOutput.children[0].textContent.includes("Connecting to backend server")) {
+                consoleOutput.querySelector('.console-message').textContent.includes("Connecting to backend server")) {
                 consoleOutput.innerHTML = "";
             }
             
@@ -266,27 +265,30 @@ function fetchConsoleLogs() {
             updateConsoleOutput(data.logs);
         })
         .catch(error => {
-            // Don't add a new error message if the backend is not available yet
-            // and we're already showing errors
-            if (consoleOutput.querySelector('.console-line:last-child .console-message')?.textContent.includes('Error fetching logs')) {
-                // Just update the timestamp on the last error
-                const lastTimestamp = consoleOutput.querySelector('.console-line:last-child .console-timestamp');
-                if (lastTimestamp) {
-                    lastTimestamp.textContent = `[${new Date().toISOString()}]`;
-                }
-                return;
-            }
+            consecutiveErrors++;
             
-            // Add a new error message if this is the first one
-            consoleOutput.innerHTML += `<div class="console-line">
-                <span class="console-timestamp">[${new Date().toISOString()}]</span>
-                <span class="console-agent console-agent-system">[System]</span>
-                <span class="console-message">Error fetching logs: Backend server not available. Start the Python server to see logs.</span>
-            </div>`;
+            // Only add error message if we don't already have an error showing
+            if (!consoleOutput.querySelector('.console-message')?.textContent.includes('Error fetching logs')) {
+                consoleOutput.innerHTML += `<div class="console-line error-line">
+                    <span class="console-timestamp">[${new Date().toISOString()}]</span>
+                    <span class="console-agent console-agent-system">[System]</span>
+                    <span class="console-message">Error fetching logs: Backend server not available. Start the Python server to see logs.</span>
+                </div>`;
+            }
             
             // Auto-scroll to bottom if enabled
             if (autoScrollCheckbox.checked) {
                 consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+            
+            // If we've had too many consecutive errors, stop polling
+            if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                stopConsolePolling();
+                consoleOutput.innerHTML += `<div class="console-line">
+                    <span class="console-timestamp">[${new Date().toISOString()}]</span>
+                    <span class="console-agent console-agent-system">[System]</span>
+                    <span class="console-message">Stopped polling due to multiple connection failures. Click "Refresh" to try again.</span>
+                </div>`;
             }
         });
 }
@@ -306,54 +308,58 @@ function initializeUI() {
     // We'll only do this when the user explicitly interacts with the system
 }
 
-// And update the toggleConsole function to only show one error
-
 function toggleConsole() {
     consoleVisible = !consoleVisible;
     
     if (consoleVisible) {
+        // Show the console without clearing its contents
         consoleContainer.style.display = 'flex';
         toggleConsoleButton.textContent = 'Hide Console';
         toggleConsoleButton.classList.add('active');
         
-        // Clear the console first
-        consoleOutput.innerHTML = "";
+        // Only fetch new logs if we don't have any yet
+        if (consoleOutput.children.length === 0) {
+            fetchConsoleLogs();
+        }
         
-        // Only fetch logs once when showing the console
-        fetchConsoleLogs();
-        
-        // Only start polling if we successfully connect
-        fetch(`${API_BASE_URL}/api/logs`)
-            .then(response => {
-                if (response.ok) {
-                    startConsolePolling();
-                }
-            })
-            .catch(() => {
-                // Don't start polling if we can't connect
-                // We'll just show one error message
-            });
+        // Start or resume polling for new logs
+        startConsolePolling();
     } else {
+        // Hide the console without clearing its contents
         consoleContainer.style.display = 'none';
         toggleConsoleButton.textContent = 'Show Console';
         toggleConsoleButton.classList.remove('active');
+        
+        // Stop polling when console is hidden to save resources
         stopConsolePolling();
     }
 }
 
-// Add this function to update the console output
 function updateConsoleOutput(logs) {
+    // If there are no logs, don't update anything
+    if (!logs || logs.length === 0) return;
+    
+    // Get the timestamp of the last log we've seen
+    let lastSeenLog = null;
+    if (consoleOutput.children.length > 0) {
+        const lastTimestampEl = consoleOutput.querySelector('.console-line:last-child .console-timestamp');
+        if (lastTimestampEl) {
+            // Extract timestamp without the brackets
+            lastSeenLog = lastTimestampEl.textContent.replace(/^\[|\]$/g, '');
+        }
+    }
+    
     // Filter out logs we've already seen
     let newLogs = logs;
-    if (lastSeenLogTimestamp) {
-        newLogs = logs.filter(log => log.timestamp > lastSeenLogTimestamp);
+    if (lastSeenLog) {
+        newLogs = logs.filter(log => {
+            // Compare timestamps, accounting for the possibility of different formats
+            return new Date(log.timestamp) > new Date(lastSeenLog);
+        });
     }
     
     // If there are new logs
     if (newLogs.length > 0) {
-        // Update the latest timestamp
-        lastSeenLogTimestamp = newLogs[newLogs.length - 1].timestamp;
-        
         // Add new logs to the console
         for (const log of newLogs) {
             const agentClass = `console-agent-${log.agent.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
@@ -380,13 +386,15 @@ function updateConsoleOutput(logs) {
     }
 }
 
-// Add this function to start polling for console updates
 function startConsolePolling() {
-    if (consolePollingInterval) {
-        clearInterval(consolePollingInterval);
-    }
+    // Clear any existing polling interval
+    stopConsolePolling();
     
+    // Start new polling interval
     consolePollingInterval = setInterval(fetchConsoleLogs, CONSOLE_POLL_INTERVAL);
+    
+    // Reset error counter
+    consecutiveErrors = 0;
 }
 
 // Add this function to stop polling for console updates

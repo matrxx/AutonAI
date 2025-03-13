@@ -130,56 +130,99 @@ class DocumentProcessor:
         else:
             return "Unsupported file format"
 
-# Define the agent types and their capabilities
+# Define the versatile agent types that can handle any domain
 AGENT_TYPES = {
-    "ProjectManager": {
-        "role": "Project Manager",
-        "skills": ["planning", "coordination", "delegation", "evaluation"],
-        "system_prompt": """You are a Project Manager AI assistant. Your responsibilities include:
-1. Breaking down projects into manageable tasks
-2. Assigning tasks to appropriate specialists
-3. Tracking project progress
-4. Coordinating between team members
-5. Ensuring all requirements are met
+    "Agent1": {
+        "role": "Versatile Agent 1",
+        "skills": ["planning", "coding", "design", "data analysis", "content creation"],
+        "system_prompt": """You are a versatile AI agent capable of handling any task across multiple domains including:
+- Software development (frontend, backend, full-stack)
+- Data analysis and visualization
+- Machine learning and AI
+- Content creation and copywriting
+- Business analysis and planning
+- Design and creative work
+- Research and information gathering
 
-When creating tasks, be specific about what needs to be done. Assign priorities (1-5, where 1 is highest) 
-and identify the most suitable agent type for each task."""
+You are not limited to any specific role or domain. When assigned a task, approach it with your full capabilities.
+
+Your response should include:
+1. A brief analysis of the task and what it requires
+2. A complete solution with all necessary code, content, or designs
+3. Any explanations needed to understand your solution
+
+IMPORTANT: You will provide complete solutions directly in your response. For code, use appropriate 
+code blocks with language identifiers. Only use explicitly available tools if needed. Otherwise, provide 
+solutions directly without trying to use unavailable tools."""
     },
-    "FrontendDev": {
-        "role": "Frontend Developer",
-        "skills": ["HTML", "CSS", "JavaScript", "UI design", "responsive design"],
-        "system_prompt": """You are a Frontend Developer AI assistant. Your responsibilities include:
-1. Creating user interfaces with HTML, CSS, and JavaScript
-2. Implementing responsive designs that work on all devices
-3. Developing interactive web components
-4. Ensuring good user experience and accessibility
-5. Working with the backend developer to integrate with APIs
+    "Agent2": {
+        "role": "Versatile Agent 2",
+        "skills": ["planning", "coding", "design", "data analysis", "content creation"],
+        "system_prompt": """You are a versatile AI agent capable of handling any task across multiple domains including:
+- Software development (frontend, backend, full-stack)
+- Data analysis and visualization
+- Machine learning and AI
+- Content creation and copywriting
+- Business analysis and planning
+- Design and creative work
+- Research and information gathering
 
-Focus on writing clean, maintainable code and providing detailed explanations of your implementation choices."""
+You are not limited to any specific role or domain. When assigned a task, approach it with your full capabilities.
+
+Your response should include:
+1. A brief analysis of the task and what it requires
+2. A complete solution with all necessary code, content, or designs
+3. Any explanations needed to understand your solution
+
+IMPORTANT: You will provide complete solutions directly in your response. For code, use appropriate 
+code blocks with language identifiers. Only use explicitly available tools if needed. Otherwise, provide 
+solutions directly without trying to use unavailable tools."""
     },
-    "BackendDev": {
-        "role": "Backend Developer",
-        "skills": ["API design", "database", "server logic", "authentication", "security"],
-        "system_prompt": """You are a Backend Developer AI assistant. Your responsibilities include:
-1. Designing and implementing APIs
-2. Creating database schemas and queries
-3. Implementing server-side business logic
-4. Setting up authentication and authorization
-5. Ensuring data security and performance
+    "Agent3": {
+        "role": "Versatile Agent 3",
+        "skills": ["planning", "coding", "design", "data analysis", "content creation"],
+        "system_prompt": """You are a versatile AI agent capable of handling any task across multiple domains including:
+- Software development (frontend, backend, full-stack)
+- Data analysis and visualization
+- Machine learning and AI
+- Content creation and copywriting
+- Business analysis and planning
+- Design and creative work
+- Research and information gathering
 
-Focus on writing robust, secure code and providing detailed explanations of your implementation choices."""
+You are not limited to any specific role or domain. When assigned a task, approach it with your full capabilities.
+
+Your response should include:
+1. A brief analysis of the task and what it requires
+2. A complete solution with all necessary code, content, or designs
+3. Any explanations needed to understand your solution
+
+IMPORTANT: You will provide complete solutions directly in your response. For code, use appropriate 
+code blocks with language identifiers. Only use explicitly available tools if needed. Otherwise, provide 
+solutions directly without trying to use unavailable tools."""
     },
-    "ContentWriter": {
-        "role": "Content Writer",
-        "skills": ["copywriting", "SEO", "storytelling", "product descriptions", "marketing"],
-        "system_prompt": """You are a Content Writer AI assistant. Your responsibilities include:
-1. Creating engaging and persuasive marketing copy
-2. Writing SEO-optimized content
-3. Developing product descriptions
-4. Crafting brand stories and narratives
-5. Editing and proofreading content
+    "Agent4": {
+        "role": "Versatile Agent 4",
+        "skills": ["planning", "coding", "design", "data analysis", "content creation"],
+        "system_prompt": """You are a versatile AI agent capable of handling any task across multiple domains including:
+- Software development (frontend, backend, full-stack)
+- Data analysis and visualization
+- Machine learning and AI
+- Content creation and copywriting
+- Business analysis and planning
+- Design and creative work
+- Research and information gathering
 
-Focus on writing clear, compelling content that resonates with the target audience and achieves the project goals."""
+You are not limited to any specific role or domain. When assigned a task, approach it with your full capabilities.
+
+Your response should include:
+1. A brief analysis of the task and what it requires
+2. A complete solution with all necessary code, content, or designs
+3. Any explanations needed to understand your solution
+
+IMPORTANT: You will provide complete solutions directly in your response. For code, use appropriate 
+code blocks with language identifiers. Only use explicitly available tools if needed. Otherwise, provide 
+solutions directly without trying to use unavailable tools."""
     }
 }
 
@@ -218,8 +261,8 @@ AGENT_TOOLS = {
     # Add other agent-specific tools as needed
 }
 
-def call_llm(messages, model="llama2:13b", timeout=120):
-    """Call the local Ollama API with extended timeout"""
+def call_llm(messages, model="llama2:13b", timeout=300, max_retries=2):
+    """Call the local Ollama API with extended timeout and better error handling"""
     # Format the messages for Ollama
     prompt = ""
     for msg in messages:
@@ -235,40 +278,47 @@ def call_llm(messages, model="llama2:13b", timeout=120):
         elif role in ["assistant", "agent"]:
             prompt += f" {content} </s>"
     
-    # Call the Ollama API
-    try:
-        response = requests.post('http://localhost:11434/api/generate',
-                        json={
-                            'model': model,
-                            'prompt': prompt,
-                            'stream': False
-                        }, timeout=timeout)
-        
-        if response.status_code == 200:
-            return response.json()['response']
-        else:
-            return f"Error calling Ollama API: {response.status_code} - {response.text}"
-    except Exception as e:
-        return f"Error connecting to Ollama: {str(e)}"
+    # Call the Ollama API with retries
+    for attempt in range(max_retries):
+        try:
+            response = requests.post('http://localhost:11434/api/generate',
+                            json={
+                                'model': model,
+                                'prompt': prompt,
+                                'stream': False
+                            }, timeout=timeout)  # Increased timeout
+            
+            if response.status_code == 200:
+                return response.json()['response']
+            else:
+                print(f"Error calling Ollama API (attempt {attempt+1}): {response.status_code} - {response.text}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)  # Wait before retry
+        except Exception as e:
+            print(f"Exception when calling Ollama (attempt {attempt+1}): {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(2)  # Wait before retry
+    
+    # If all retries failed, return a simple error message
+    return "I was unable to process this task due to a connection issue. Please try a different approach or provide a different task description."
 
 def parse_llm_response(response: str, expecting_json=False):
-    """Parse the LLM response for actions or JSON content"""
-    # Check for tool usage
-    if "ACTION:" in response:
-        action_part = response.split("ACTION:")[1].strip()
-        tool_name = action_part.split("\n")[0].strip()
-        
-        # Only proceed if we find an INPUT section
-        if "INPUT:" in action_part:
-            input_part = action_part.split("INPUT:")[1].strip()
-            
-            # Only process valid inputs
-            if input_part:
-                return {
-                    "type": "action",
-                    "tool": tool_name,
-                    "input": input_part
-                }
+    """Parse the LLM response for actions or JSON content with better resilience"""
+    # Check for tool usage with more flexible pattern matching
+    action_patterns = [
+        r"ACTION:\s*(\w+)[\s\n]*INPUT:\s*([\s\S]+?)(?=\n\n|$)",  # Standard format
+        r"I'll use the (\w+) tool[\s\n]*Input:\s*([\s\S]+?)(?=\n\n|$)",  # Conversational format
+        r"I need to use the (\w+) tool[\s\n]*with input:[\s\n]*([\s\S]+?)(?=\n\n|$)"  # Another variant
+    ]
+    
+    for pattern in action_patterns:
+        match = re.search(pattern, response, re.IGNORECASE)
+        if match:
+            return {
+                "type": "action",
+                "tool": match.group(1).strip(),
+                "input": match.group(2).strip()
+            }
     
     # Check if we're expecting JSON
     if expecting_json:
@@ -351,13 +401,13 @@ if not os.path.exists(OUTPUT_DIR):
 # Improved file saving function for agent.py
 
 def save_output_file(agent_type, file_name, content, file_type='text'):
-    """Save agent output as a file that can be downloaded later"""
+    """Save agent output as a file, extracting code blocks if needed"""
     # Create agent-specific folder if it doesn't exist
     agent_dir = os.path.join(OUTPUT_DIR, agent_type)
     if not os.path.exists(agent_dir):
         os.makedirs(agent_dir)
     
-    # Sanitize file name (remove spaces and special characters)
+    # Sanitize file name
     safe_name = "".join([c for c in file_name if c.isalnum() or c in "._-"]).strip()
     if not safe_name:
         safe_name = "output"
@@ -368,30 +418,24 @@ def save_output_file(agent_type, file_name, content, file_type='text'):
     # Determine file extension based on content and type
     extension = ".txt"  # Default
     
-    # Extract code blocks if present
-    code_block_pattern = r'```(?:\w+)?\s*([\s\S]+?)\s*```'
-    code_blocks = re.findall(code_block_pattern, content)
+    # Try to extract code blocks from the content
+    extracted_content = extract_code_from_response(content, file_type)
     
-    # If we found code blocks, use the first one as content (if appropriate)
-    extracted_content = content
-    if code_blocks and ('html' in file_type.lower() or 'css' in file_type.lower() or 'js' in file_type.lower()):
-        extracted_content = code_blocks[0]
-    
-    # Use proper extension based on file_type or content detection
-    if file_type == 'html' or content.strip().startswith('<') and ('</html>' in content or '</body>' in content):
+    # Set proper extension based on file_type
+    if file_type == 'html':
         extension = ".html"
-    elif file_type == 'css' or content.find('@media') > 0 or content.find('{') > 0 and content.find('}') > 0:
+    elif file_type == 'css':
         extension = ".css"
-    elif file_type == 'js' or 'function(' in content or 'const ' in content or 'let ' in content:
+    elif file_type == 'js':
         extension = ".js"
-    elif file_type == 'json' or (content.strip().startswith('{') and content.strip().endswith('}')):
+    elif file_type == 'json':
         extension = ".json"
     
     # Create full file name with timestamp and extension
     full_name = f"{timestamp}_{safe_name}{extension}"
     file_path = os.path.join(agent_dir, full_name)
     
-    # Write content to file (use the extracted content if available)
+    # Write content to file
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(extracted_content)
     
@@ -404,15 +448,65 @@ def save_output_file(agent_type, file_name, content, file_type='text'):
         'type': extension[1:]  # Remove the dot
     }
 
+def extract_code_from_response(content, file_type):
+    """
+    Extract actual code from an agent response, removing markdown and error messages
+    """
+    # Check if this is an error message
+    if "Error connecting to Ollama" in content:
+        return "// The agent was unable to generate content due to connection issues."
+    
+    # Try to extract code blocks with the appropriate language tag
+    code_block_pattern = None
+    
+    if file_type == 'html':
+        code_block_pattern = r'```(?:html)?\s*([\s\S]+?)\s*```'
+    elif file_type == 'css':
+        code_block_pattern = r'```(?:css)?\s*([\s\S]+?)\s*```'
+    elif file_type == 'js':
+        code_block_pattern = r'```(?:javascript|js)?\s*([\s\S]+?)\s*```'
+    elif file_type == 'json':
+        code_block_pattern = r'```(?:json)?\s*([\s\S]+?)\s*```'
+    
+    # If we have a pattern, try to extract code
+    if code_block_pattern:
+        matches = re.findall(code_block_pattern, content, re.IGNORECASE)
+        if matches:
+            # Return the first matching code block
+            return matches[0]
+    
+    # If no specific code block found, try to extract any code block
+    generic_code_block = re.findall(r'```(?:\w+)?\s*([\s\S]+?)\s*```', content)
+    if generic_code_block:
+        return generic_code_block[0]
+    
+    # If no code blocks found, check if the content might be direct code
+    if file_type == 'html' and content.strip().startswith('<') and ('</html>' in content or '</body>' in content):
+        return content
+    elif file_type == 'css' and '{' in content and '}' in content:
+        return content
+    elif file_type == 'js' and ('function' in content or 'const ' in content or 'let ' in content):
+        return content
+    
+    # Default case, just return the content
+    return content
+
 def process_task(task):
-    """Process a single task using the appropriate agent"""
+    """Process a single task with better error handling and file extraction"""
     agent_type = task.agent_type
     if not agent_type:
-        log_update("System", f"No agent type specified for task: {task.description}. Defaulting to ProjectManager.")
-        agent_type = "ProjectManager"
+        log_update("System", f"No agent type specified for task: {task.description}. Defaulting to Agent1.")
+        agent_type = "Agent1"
     
     # Get appropriate prompt for this agent and task
     system_prompt = get_agent_prompt(agent_type, task.description)
+    
+    # Add direct instructions to avoid tool usage
+    system_prompt += """
+IMPORTANT: Please provide your complete solution directly in your response. 
+Do not try to use specialized tools or actions. Include any code directly using 
+markdown code blocks with appropriate language tags.
+"""
     
     # Create context for the LLM
     messages = [
@@ -420,168 +514,50 @@ def process_task(task):
         {"role": "user", "content": f"Complete this task: {task.description}"}
     ]
     
-    # Add information about available tools
-    tools_description = "Available tools:\n"
-    # Add common tools
-    for tool_name, tool in COMMON_TOOLS.items():
-        tools_description += f"- {tool}\n"
-    
-    # Add agent-specific tools
-    if agent_type in AGENT_TOOLS:
-        for tool_name, tool in AGENT_TOOLS[agent_type].items():
-            tools_description += f"- {tool}\n"
-    
-    messages[0]["content"] += f"\n\n{tools_description}"
-    
     # Update task status
     task.update_status("in_progress", f"Task started by {agent_type}")
     log_update(agent_type, f"Working on: {task.description}")
     
-    # Call the LLM with an increased timeout
-    response = call_llm(messages, timeout=240)
+    # Call the LLM with increased timeout
+    response = call_llm(messages, timeout=300)
     
-    # Parse the response
-    parsed = parse_llm_response(response)
-    
-    if parsed["type"] == "action":
-        # Agent wants to use a tool
-        tool_name = parsed["tool"]
-        tool_input = parsed["input"]
-        
-        tool_result = None
-        found_tool = False
-        
-        # Look for tool in common tools with case-insensitive matching
-        if tool_name.lower() in [t.lower() for t in COMMON_TOOLS.keys()]:
-            # Find the actual key with correct casing
-            for key in COMMON_TOOLS.keys():
-                if key.lower() == tool_name.lower():
-                    tool_result = COMMON_TOOLS[key].run(tool_input)
-                    found_tool = True
-                    break
-        
-        # Look for tool in agent-specific tools with case-insensitive matching
-        elif agent_type in AGENT_TOOLS:
-            for key in AGENT_TOOLS[agent_type].keys():
-                if key.lower() == tool_name.lower():
-                    tool_result = AGENT_TOOLS[agent_type][key].run(tool_input)
-                    found_tool = True
-                    break
-        
-        # If tool not found, log the error and provide a helpful message
-        if not found_tool:
-            available_tools = list(COMMON_TOOLS.keys())
-            if agent_type in AGENT_TOOLS:
-                available_tools.extend(list(AGENT_TOOLS[agent_type].keys()))
-            
-            error_msg = f"Tool '{tool_name}' not found. Available tools: {', '.join(available_tools)}"
-            log_update("System", error_msg)
-            tool_result = error_msg
-        
-        # Log the tool usage
-        log_update(agent_type, f"Used tool: {tool_name} with input: {tool_input}")
-        log_update("System", f"Tool result: {tool_result}")
-        
-        # Add the tool result to the conversation
-        messages.append({"role": "assistant", "content": f"I'll use the {tool_name} tool with input: {tool_input}"})
-        messages.append({"role": "system", "content": f"Tool result: {tool_result}"})
-        
-        # Ask the agent to provide its final result
-        messages.append({"role": "user", "content": "Now that you have the tool result, please complete the task and provide your final output."})
-        
-        # Get the final response
-        final_response = call_llm(messages, timeout=240)
-        task.result = final_response
-    else:
-        # Agent provided a direct response
-        task.result = response
+    # Store the result
+    task.result = response
     
     # Mark task as completed
     task.update_status("completed", f"Task completed by {agent_type}")
     log_update(agent_type, f"Completed task: {task.description}")
     
-    # Enhanced file saving functionality
+    # Save relevant output files based on task description
     if task.result:
-        # Check task description for clues about file type
+        # Detect file types from task description
         desc_lower = task.description.lower()
-        file_type = 'text'
         
-        # More aggressive file type detection
-        if any(term in desc_lower for term in ['html', 'webpage', 'web page', 'landing page', 'site']):
-            file_type = 'html'
-        elif any(term in desc_lower for term in ['css', 'style', 'stylesheet']):
-            file_type = 'css'
-        elif any(term in desc_lower for term in ['javascript', 'js', 'script', 'interactive']):
-            file_type = 'js'
-        elif any(term in desc_lower for term in ['json', 'api response', 'data format']):
-            file_type = 'json'
+        # First save the full response as text
+        file_info = save_output_file(agent_type, f"{task.description[:30]}_full", task.result, 'text')
+        log_update(agent_type, f"Full response saved as: {file_info['name']}")
         
-        # Also check content for patterns if type still undetermined
-        content = task.result
-        if file_type == 'text':  # Only do content detection if type not already determined
-            if content.strip().startswith('<') and ('</html>' in content or '</body>' in content):
-                file_type = 'html'
-            elif '{' in content and '}' in content and (':' in content or '@media' in content or '@keyframes' in content):
-                file_type = 'css'
-            elif ('function(' in content or 'const ' in content or 'let ' in content or 'var ' in content) and (';' in content):
-                file_type = 'js'
-            elif content.strip().startswith('{') and content.strip().endswith('}'):
-                file_type = 'json'
-        
-        # Extract code blocks if present
-        code_block_pattern = r'```(?:\w+)?\s*([\s\S]+?)\s*```'
-        code_blocks = re.findall(code_block_pattern, content)
-        
-        # Use the extracted content if appropriate
-        extracted_content = content
-        if code_blocks and file_type != 'text':
-            extracted_content = code_blocks[0]
+        # Now extract and save specific files based on content detected in description
+        if 'html' in desc_lower or 'webpage' in desc_lower or 'website' in desc_lower:
+            html_info = save_output_file(agent_type, f"{task.description[:30]}_html", task.result, 'html')
+            log_update(agent_type, f"HTML content saved as: {html_info['name']}")
             
-            # Clean up any remaining markdown code fences
-            extracted_content = re.sub(r'^```\w*\s*', '', extracted_content)
-            extracted_content = re.sub(r'\s*```$', '', extracted_content)
+        if 'css' in desc_lower or 'style' in desc_lower:
+            css_info = save_output_file(agent_type, f"{task.description[:30]}_css", task.result, 'css')
+            log_update(agent_type, f"CSS content saved as: {css_info['name']}")
+            
+        if 'javascript' in desc_lower or 'js' in desc_lower:
+            js_info = save_output_file(agent_type, f"{task.description[:30]}_js", task.result, 'js')
+            log_update(agent_type, f"JavaScript content saved as: {js_info['name']}")
         
-        # Create a suitable filename from the task description
-        file_name = re.sub(r'[^\w\s.-]', '', task.description[:40]).strip()
-        file_name = re.sub(r'\s+', '_', file_name)
-        
-        # Save the output as a file
-        file_info = save_output_file(task.agent_type, file_name, extracted_content, file_type)
+        # Store file info on the task
         task.file_info = file_info
-        
-        log_update(agent_type, f"Output saved as file: {file_info['name']}")
-        
-        # Also check for additional code blocks to save as separate files
-        code_block_pattern = r'```(\w+)\s*([\s\S]+?)\s*```'
-        code_blocks = re.findall(code_block_pattern, task.result)
-        
-        for i, (language, code) in enumerate(code_blocks):
-            # Skip if this is likely the main file we already saved
-            if i == 0 and file_type != 'text' and language.lower() in file_type:
-                continue
-                
-            # Determine file type from language
-            block_file_type = 'text'
-            if language.lower() in ['html', 'xml']:
-                block_file_type = 'html'
-            elif language.lower() in ['css']:
-                block_file_type = 'css'
-            elif language.lower() in ['javascript', 'js']:
-                block_file_type = 'js'
-            elif language.lower() in ['json']:
-                block_file_type = 'json'
-                
-            # Save this code block as a separate file
-            block_file_name = f"{file_name}_part{i+1}"
-            block_file_info = save_output_file(task.agent_type, block_file_name, code, block_file_type)
-            
-            log_update(agent_type, f"Additional output saved: {block_file_info['name']}")
     
     # Return the result
     return task.result
 
 def create_project_plan(description):
-    """Create an initial project plan using the project manager agent"""
+    """Create an initial project plan with proper agent type validation"""
     global project_status
     
     # Reset project status
@@ -594,7 +570,7 @@ def create_project_plan(description):
     }
     
     # Create a prompt for the project manager
-    system_prompt = AGENT_TYPES["ProjectManager"]["system_prompt"]
+    system_prompt = AGENT_TYPES["Agent1"]["system_prompt"]
     prompt = f"""
 {system_prompt}
 
@@ -603,14 +579,14 @@ You need to create a detailed project plan for the following project:
 {description}
 
 Break down this project into specific tasks that can be assigned to our team of specialists:
-- ProjectManager (you): Planning, coordination, delegation
-- FrontendDev: HTML, CSS, JavaScript, UI design, responsive design
-- BackendDev: API design, database, server logic, authentication, security
-- ContentWriter: Copywriting, SEO, storytelling, product descriptions, marketing
+- Agent1 (you): Planning, coordination, delegation
+- Agent2: Implementation, development
+- Agent3: Design, creative work
+- Agent4: Testing, validation
 
 For each task, specify:
 1. A clear, specific description
-2. The agent type who should handle it
+2. The agent type who should handle it (Agent1, Agent2, Agent3, or Agent4 only)
 3. Priority (1-5, where 1 is highest)
 4. Any dependencies (task IDs that must be completed first)
 
@@ -628,9 +604,16 @@ Respond with a JSON array of tasks, where each task has the fields: description,
         # Successfully parsed JSON list of tasks
         task_list = parsed["content"]
         for task_data in task_list:
+            # Get agent type with validation
+            agent_type = task_data.get("agent_type", "Agent1")
+            # Ensure it's a valid agent type
+            if agent_type not in AGENT_TYPES:
+                log_update("System", f"Invalid agent type: {agent_type}. Using Agent1 instead.")
+                agent_type = "Agent1"
+                
             task = Task(
                 description=task_data.get("description", "Undefined task"),
-                agent_type=task_data.get("agent_type", "ProjectManager"),
+                agent_type=agent_type,
                 priority=task_data.get("priority", 3),
                 dependencies=task_data.get("dependencies", [])
             )
@@ -648,8 +631,8 @@ Respond with a JSON array of tasks, where each task has the fields: description,
             # Look for task indicators
             if line.startswith("-") or line.startswith("*") or line.startswith("Task"):
                 # Try to extract agent type
-                agent_match = re.search(r'(ProjectManager|FrontendDev|BackendDev|ContentWriter)', line)
-                agent_type = agent_match.group(1) if agent_match else "ProjectManager"
+                agent_match = re.search(r'(Agent1|Agent2|Agent3|Agent4)', line)
+                agent_type = agent_match.group(1) if agent_match else "Agent1"
                 
                 # Create a new task
                 description = re.sub(r'^\s*[-*]\s*', '', line)
@@ -660,7 +643,7 @@ Respond with a JSON array of tasks, where each task has the fields: description,
     
     # If we still have no tasks, create a generic one
     if not tasks:
-        task = Task(description=f"Implement project: {description}", agent_type="ProjectManager")
+        task = Task(description=f"Implement project: {description}", agent_type="Agent1")
         tasks.append(task)
     
     # Sort tasks by priority
@@ -671,11 +654,21 @@ Respond with a JSON array of tasks, where each task has the fields: description,
         project_status["tasks"].append(task.to_dict())
     
     # Log the plan creation
-    log_update("ProjectManager", f"Created project plan with {len(tasks)} tasks")
+    log_update("Agent1", f"Created project plan with {len(tasks)} tasks")
     for task in tasks:
-        log_update("ProjectManager", f"Task: {task.description} (Assigned to: {task.agent_type})")
+        log_update("Agent1", f"Task: {task.description} (Assigned to: {task.agent_type})")
     
     return tasks
+
+# Update the initial UI message
+def initializeUI():
+    # Display welcome message
+    appendMessage('system', 'Multi-Agent System initialized. The following versatile agents are ready to assist you:\n' +
+        '- Agent1: Versatile coordinator capable of handling any task\n' +
+        '- Agent2: Versatile agent capable of handling any task\n' +
+        '- Agent3: Versatile agent capable of handling any task\n' +
+        '- Agent4: Versatile agent capable of handling any task\n\n' +
+        'To start a project, type "start project: [your project description]"')
 
 def log_update(agent, message):
     """Log an update from an agent to the shared memory"""
@@ -689,7 +682,7 @@ def log_update(agent, message):
     print(f"[{timestamp}] [{agent}] {message}")
 
 def get_next_task():
-    """Get the next task to be processed based on priority and dependencies"""
+    """Get the next task to be processed with proper agent type validation"""
     pending_tasks = []
     
     for t in project_status["tasks"]:
@@ -700,6 +693,13 @@ def get_next_task():
                 agent_type=t.get("agent_type"),
                 priority=t.get("priority", 3)
             )
+            
+            # Validate agent type
+            if not task.agent_type or task.agent_type not in AGENT_TYPES:
+                # Set a default agent type (Agent1)
+                task.agent_type = "Agent1"
+                log_update("System", f"Invalid agent type detected. Setting to Agent1 for task: {task.description[:50]}...")
+            
             # Set the ID to match the stored task
             task.id = t["id"]
             
@@ -750,8 +750,10 @@ def update_project_progress():
     project_status["progress"] = int((completed_tasks / total_tasks) * 100)
     project_status["last_update"] = datetime.now()
 
+# Add this to your worker_thread function to catch and handle errors better
+
 def worker_thread():
-    """Background worker thread that processes tasks"""
+    """Background worker thread that processes tasks with better error handling"""
     global system_running
     
     while system_running:
@@ -763,30 +765,44 @@ def worker_thread():
                     task_queue.put(next_task)
             
             # Try to get a task with a 5-second timeout
-            task = task_queue.get(timeout=5)
-            
-            # Process the task
-            process_task(task)
-            
-            # Update the corresponding task in project_status
-            for i, t in enumerate(project_status["tasks"]):
-                if t["id"] == task.id:
-                    project_status["tasks"][i] = task.to_dict()
-                    break
-            
-            # Update project progress
-            update_project_progress()
-            
-            # Mark task as done
-            task_queue.task_done()
-            
-        except queue.Empty:
-            # No tasks in queue, sleep briefly
-            time.sleep(1)
+            try:
+                task = task_queue.get(timeout=5)
+                
+                # Verify the agent type exists before processing
+                if not task.agent_type or task.agent_type not in AGENT_TYPES:
+                    log_update("System", f"Invalid agent type: {task.agent_type}. Using Agent1 instead.")
+                    task.agent_type = "Agent1"  # Default to Agent1
+                
+                # Process the task
+                process_task(task)
+                
+                # Update the corresponding task in project_status
+                for i, t in enumerate(project_status["tasks"]):
+                    if t["id"] == task.id:
+                        project_status["tasks"][i] = task.to_dict()
+                        break
+                
+                # Update project progress
+                update_project_progress()
+                
+                # Mark task as done
+                task_queue.task_done()
+                
+            except queue.Empty:
+                # No tasks in queue, sleep briefly
+                time.sleep(1)
+                
         except Exception as e:
-            # Log any errors
+            # Get detailed error information
+            import traceback
+            error_details = traceback.format_exc()
+            
+            # Log the specific error with details
             log_update("System", f"Error in worker thread: {str(e)}")
-            time.sleep(5)  # Sleep longer after an error to avoid rapid error loops
+            print(f"Detailed error: {error_details}")
+            
+            # Sleep longer after an error to avoid rapid error loops
+            time.sleep(5)
 
 # Flask routes
 @app.route('/')
