@@ -12,6 +12,8 @@
 
 # Current Advancement
 ![Progress](https://img.shields.io/badge/Progress-70%25-blue)
+<progress value="70" max="100"></progress>
+
 
 # Roadmap:
 *for the roadmap basically eveything is under the radar but the points with the 🛠️ emoji means that it is the priority*
