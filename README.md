@@ -15,7 +15,11 @@
 
 [██----------] 20%
 
+Major issues : 
 
+- Upgrading the LLM requires to handle the VRAM charge which is important
+- The goal is to keep it accessible to majority of the hardware
+- Having the expected result takes times
 
 # Roadmap:
 *for the roadmap basically eveything is under the radar but the points with the 🛠️ emoji means that it is the priority*
