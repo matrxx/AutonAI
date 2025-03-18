@@ -10,6 +10,8 @@
 
 ![AutonAI - Illustration](https://github.com/user-attachments/assets/9c570997-507b-499e-80d9-052e565c7ac7)
 
+# Current Advancement
+![Progress](https://progress-bar.dev/70/)
 
 # Roadmap:
 *for the roadmap basically eveything is under the radar but the points with the 🛠️ emoji means that it is the priority*
