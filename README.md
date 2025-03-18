@@ -13,7 +13,6 @@
 # Current Advancement
 ![Progress](https://img.shields.io/badge/Progress-20%25-blue)
 
-[██----------] 20%
 
 Major issues : 
 
