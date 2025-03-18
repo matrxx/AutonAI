@@ -11,8 +11,9 @@
 ![AutonAI - Illustration](https://github.com/user-attachments/assets/9c570997-507b-499e-80d9-052e565c7ac7)
 
 # Current Advancement
-![Progress](https://img.shields.io/badge/Progress-70%25-blue)
-<progress value="70" max="100"></progress>
+![Progress](https://img.shields.io/badge/Progress-20%25-blue)
+![██----------] 20%
+
 
 
 # Roadmap:
