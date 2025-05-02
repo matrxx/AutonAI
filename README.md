@@ -1,4 +1,7 @@
 # AutonAI
+
+// The project is in "standby" mode because I realized that I need a way bigger hardware to make it the way I want it (something like 40GB of VRAM to run the LLMs locally. So i'll wait for the open sources models to make lighter llms that fits my needs.
+
 1. Install Ollama via https://ollama.com/ and wamp via https://wampserver.aviatechno.net/ (+ all the packages)
 2. Install everything in the useful.txt via a pip install
 3. Run the OllamaSetup.exe and make sure it's running before doing next
